@@ -6,6 +6,9 @@ import useRoomStore from '../stores/roomStore';
 import usePlayerStore from '../stores/playerStore';
 import { useState } from 'react';
 import AddToPlaylistModal from './AddToPlaylistModal';
+import ContextMenu from './ContextMenu';
+import { downloadTrack } from '../utils/downloadTrack';
+import { Download } from 'lucide-react';
 
 function formatMs(ms) {
   if (!ms) return '0:00';
@@ -20,6 +23,7 @@ export default function TrackList() {
   const { currentRoom, tracks, removeTrack } = useRoomStore();
   const { currentTrackId, actionSequence } = usePlayerStore();
   const [selectedTrackForPlaylist, setSelectedTrackForPlaylist] = useState(null);
+  const [contextMenu, setContextMenu] = useState(null);
 
   if (!currentRoom) return null;
 
@@ -32,6 +36,15 @@ export default function TrackList() {
       roomId: currentRoom._id,
       trackId,
       actionSequence,
+    });
+  }
+
+  function handleContextMenu(e, track) {
+    e.preventDefault();
+    setContextMenu({
+      x: e.clientX,
+      y: e.clientY,
+      track
     });
   }
 
@@ -61,6 +74,7 @@ export default function TrackList() {
             <li
               key={track._id}
               onClick={() => handleSelect(track._id)}
+              onContextMenu={(e) => handleContextMenu(e, track)}
               className={`flex items-center gap-4 p-4 rounded-xl cursor-pointer transition-all border ${isPlaying ? 'bg-primary/10 border-primary/30 shadow-[0_0_15px_rgba(30,215,96,0.1)]' : 'bg-white/5 border-white/5 hover:bg-white/10'}`}
             >
               <div className="flex items-center gap-4 flex-1 min-w-0">
@@ -107,6 +121,21 @@ export default function TrackList() {
         <AddToPlaylistModal 
           track={selectedTrackForPlaylist} 
           onClose={() => setSelectedTrackForPlaylist(null)} 
+        />
+      )}
+
+      {contextMenu && (
+        <ContextMenu 
+          x={contextMenu.x} 
+          y={contextMenu.y} 
+          onClose={() => setContextMenu(null)}
+          items={[
+            {
+              label: 'Download Song',
+              icon: <Download size={16} />,
+              onClick: () => downloadTrack(contextMenu.track)
+            }
+          ]}
         />
       )}
     </div>

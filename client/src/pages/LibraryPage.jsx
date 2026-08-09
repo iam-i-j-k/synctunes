@@ -4,6 +4,9 @@ import { Heart, ListMusic, Music, Play, Plus, ArrowLeft, Trash2 } from 'lucide-r
 import api from '../api/axios';
 import useAuthStore from '../stores/authStore';
 import AddToPlaylistModal from '../components/AddToPlaylistModal';
+import ContextMenu from '../components/ContextMenu';
+import { downloadTrack } from '../utils/downloadTrack';
+import { Download } from 'lucide-react';
 
 import useRoomStore from '../stores/roomStore';
 import usePlayerStore from '../stores/playerStore';
@@ -28,6 +31,8 @@ export default function LibraryPage() {
   const [loadingPlaylist, setLoadingPlaylist] = useState(false);
   
   const [selectedTrackForPlaylist, setSelectedTrackForPlaylist] = useState(null);
+  
+  const [contextMenu, setContextMenu] = useState(null);
 
   const { currentRoom } = useRoomStore();
   const { actionSequence } = usePlayerStore();
@@ -113,6 +118,15 @@ export default function LibraryPage() {
     } finally {
       setCreating(false);
     }
+  }
+
+  function handleContextMenu(e, track) {
+    e.preventDefault();
+    setContextMenu({
+      x: e.clientX,
+      y: e.clientY,
+      track
+    });
   }
 
   useEffect(() => {
@@ -219,7 +233,12 @@ export default function LibraryPage() {
             ) : (
               <div className="flex flex-col gap-1">
                 {likedTracks.map((track, i) => (
-                  <div key={track._id} className="flex items-center gap-4 p-3 rounded-lg hover:bg-white/5 group transition-colors cursor-pointer" onClick={() => addAndPlayTrack(track._id)}>
+                  <div 
+                    key={track._id} 
+                    className="flex items-center gap-4 p-3 rounded-lg hover:bg-white/5 group transition-colors cursor-pointer" 
+                    onClick={() => addAndPlayTrack(track._id)}
+                    onContextMenu={(e) => handleContextMenu(e, track)}
+                  >
                     <div className="w-8 text-right text-gray-400 group-hover:hidden">{i + 1}</div>
                     <div className="w-8 text-right hidden group-hover:block" onClick={(e) => { e.stopPropagation(); addAndPlayTrack(track._id); }}>
                       <Play size={16} fill="currentColor" className="text-white" />
@@ -328,7 +347,12 @@ export default function LibraryPage() {
             ) : (
               <div className="flex flex-col gap-1">
                 {activePlaylist.trackIds.map((track, i) => (
-                  <div key={track._id} className="flex items-center gap-4 p-3 rounded-lg hover:bg-white/5 group transition-colors cursor-pointer" onClick={() => addAndPlayTrack(track._id)}>
+                  <div 
+                    key={track._id} 
+                    className="flex items-center gap-4 p-3 rounded-lg hover:bg-white/5 group transition-colors cursor-pointer" 
+                    onClick={() => addAndPlayTrack(track._id)}
+                    onContextMenu={(e) => handleContextMenu(e, track)}
+                  >
                     <div className="w-8 text-right text-gray-400 group-hover:hidden">{i + 1}</div>
                     <div className="w-8 text-right hidden group-hover:block" onClick={(e) => { e.stopPropagation(); addAndPlayTrack(track._id); }}>
                       <Play size={16} fill="currentColor" className="text-white" />
@@ -400,6 +424,22 @@ export default function LibraryPage() {
         <AddToPlaylistModal 
           track={selectedTrackForPlaylist}
           onClose={() => setSelectedTrackForPlaylist(null)}
+        />
+      )}
+
+      {/* Context Menu */}
+      {contextMenu && (
+        <ContextMenu 
+          x={contextMenu.x} 
+          y={contextMenu.y} 
+          onClose={() => setContextMenu(null)}
+          items={[
+            {
+              label: 'Download Song',
+              icon: <Download size={16} />,
+              onClick: () => downloadTrack(contextMenu.track)
+            }
+          ]}
         />
       )}
     </div>
