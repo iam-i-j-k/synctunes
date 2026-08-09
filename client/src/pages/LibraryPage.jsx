@@ -156,29 +156,29 @@ export default function LibraryPage() {
   return (
     <div className="flex-1 flex flex-col bg-zinc-900 overflow-y-auto">
       {/* Header Area */}
-      <div className="px-10 py-12 bg-gradient-to-b from-indigo-900/40 to-zinc-900 flex items-end gap-6">
+      <div className="px-4 md:px-10 py-8 md:py-12 bg-gradient-to-b from-indigo-900/40 to-zinc-900 flex flex-col md:flex-row items-center md:items-end gap-4 md:gap-6 text-center md:text-left">
         {tab === 'likes' && !activePlaylist ? (
           <>
-            <div className="w-48 h-48 rounded-xl shadow-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
-              <Heart size={80} fill="white" className="text-white drop-shadow-lg" />
+            <div className="w-32 h-32 md:w-48 md:h-48 rounded-xl shadow-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center flex-shrink-0">
+              <Heart size={60} fill="white" className="text-white drop-shadow-lg md:w-[80px] md:h-[80px]" />
             </div>
-            <div className="flex flex-col gap-2">
-              <span className="text-sm font-bold uppercase tracking-wider text-white/80">Playlist</span>
-              <h1 className="text-7xl font-extrabold text-white tracking-tighter">Liked Songs</h1>
-              <span className="text-sm text-gray-300 font-medium">{user?.username} • {likedTracks.length} songs</span>
+            <div className="flex flex-col gap-1 md:gap-2">
+              <span className="text-xs md:text-sm font-bold uppercase tracking-wider text-white/80">Playlist</span>
+              <h1 className="text-4xl md:text-7xl font-extrabold text-white tracking-tighter">Liked Songs</h1>
+              <span className="text-xs md:text-sm text-gray-300 font-medium">{user?.username} • {likedTracks.length} songs</span>
             </div>
           </>
         ) : activePlaylist ? (
           <>
-            <div className="w-48 h-48 rounded-xl shadow-2xl bg-zinc-800 flex items-center justify-center">
-              <ListMusic size={80} className="text-white/20" />
+            <div className="w-32 h-32 md:w-48 md:h-48 rounded-xl shadow-2xl bg-zinc-800 flex items-center justify-center flex-shrink-0">
+              <ListMusic size={60} className="text-white/20 md:w-[80px] md:h-[80px]" />
             </div>
-            <div className="flex flex-col gap-2 flex-1">
-              <span className="text-sm font-bold uppercase tracking-wider text-white/80">Playlist</span>
-              <h1 className="text-7xl font-extrabold text-white tracking-tighter truncate max-w-[800px]">{activePlaylist.name}</h1>
-              <span className="text-sm text-gray-300 font-medium">{user?.username} • {activePlaylist.trackIds?.length || 0} songs</span>
+            <div className="flex flex-col gap-1 md:gap-2 flex-1 items-center md:items-start">
+              <span className="text-xs md:text-sm font-bold uppercase tracking-wider text-white/80">Playlist</span>
+              <h1 className="text-4xl md:text-7xl font-extrabold text-white tracking-tighter truncate max-w-full md:max-w-[800px]">{activePlaylist.name}</h1>
+              <span className="text-xs md:text-sm text-gray-300 font-medium">{user?.username} • {activePlaylist.trackIds?.length || 0} songs</span>
             </div>
-            <div className="self-end mb-4">
+            <div className="self-center md:self-end mt-2 md:mt-0 md:mb-4">
               <button 
                 onClick={handleDeletePlaylist}
                 className="flex items-center gap-2 px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-full transition-colors text-sm font-bold"
@@ -189,20 +189,20 @@ export default function LibraryPage() {
           </>
         ) : (
           <>
-            <div className="w-48 h-48 rounded-xl shadow-2xl bg-zinc-800 flex items-center justify-center">
-              <ListMusic size={80} className="text-white/20" />
+            <div className="w-32 h-32 md:w-48 md:h-48 rounded-xl shadow-2xl bg-zinc-800 flex items-center justify-center flex-shrink-0">
+              <ListMusic size={60} className="text-white/20 md:w-[80px] md:h-[80px]" />
             </div>
-            <div className="flex flex-col gap-2">
-              <span className="text-sm font-bold uppercase tracking-wider text-white/80">Collection</span>
-              <h1 className="text-7xl font-extrabold text-white tracking-tighter">Playlists</h1>
-              <span className="text-sm text-gray-300 font-medium">{user?.username} • {playlists.length} playlists</span>
+            <div className="flex flex-col gap-1 md:gap-2 items-center md:items-start">
+              <span className="text-xs md:text-sm font-bold uppercase tracking-wider text-white/80">Collection</span>
+              <h1 className="text-4xl md:text-7xl font-extrabold text-white tracking-tighter">Playlists</h1>
+              <span className="text-xs md:text-sm text-gray-300 font-medium">{user?.username} • {playlists.length} playlists</span>
             </div>
           </>
         )}
       </div>
 
       {/* Content Area */}
-      <div className="px-10 py-6">
+      <div className="px-4 md:px-10 py-6">
         {tab === 'likes' && (
           <div className="flex flex-col w-full">
             <div className="flex items-center gap-4 text-gray-400 border-b border-white/10 pb-2 mb-4 px-4 text-sm font-medium uppercase tracking-wider">
@@ -267,7 +267,7 @@ export default function LibraryPage() {
                 <p>Create a playlist to organize your music.</p>
               </div>
             ) : (
-              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
+              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 md:gap-6">
                 {playlists.map(playlist => (
                   <div 
                     key={playlist._id} 

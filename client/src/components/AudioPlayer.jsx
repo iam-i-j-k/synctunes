@@ -256,36 +256,52 @@ export default function AudioPlayer() {
   const volumePercentage = volume * 100;
 
   return (
-    <div className="h-[96px] w-full flex items-center justify-between px-6 bg-zinc-950/80 backdrop-blur-3xl border border-white/10 rounded-[2.5rem] shadow-[0_20px_40px_rgba(0,0,0,0.5)] transition-all">
+    <div className="h-[64px] md:h-[96px] w-full flex items-center justify-between px-3 md:px-6 bg-zinc-950/90 md:bg-zinc-950/80 backdrop-blur-3xl border border-white/10 rounded-xl md:rounded-[2.5rem] shadow-[0_10px_30px_rgba(0,0,0,0.5)] md:shadow-[0_20px_40px_rgba(0,0,0,0.5)] transition-all">
       <audio ref={audioRef} src={currentTrack.cloudinaryUrl} preload="auto" />
 
       {/* LEFT: Art & Info */}
-      <div className="flex-1 min-w-0 flex items-center gap-4 pr-4 justify-start">
+      <div className="flex-1 min-w-0 flex items-center gap-3 md:gap-4 pr-2 md:pr-4 justify-start">
         <div 
-          className="w-14 h-14 rounded-2xl flex items-center justify-center text-white/80 flex-shrink-0 shadow-[0_4px_15px_rgba(0,0,0,0.5)] relative overflow-hidden group"
+          className="w-10 h-10 md:w-14 md:h-14 rounded-lg md:rounded-2xl flex items-center justify-center text-white/80 flex-shrink-0 shadow-[0_4px_15px_rgba(0,0,0,0.5)] relative overflow-hidden group"
           style={{ background: stringToGradient(currentTrack.title) }}
         >
           {playbackState.isPlaying && (
             <div className="absolute inset-0 bg-black/20 flex items-center justify-center">
-              <div className="w-4 h-4 rounded-full bg-white/30 animate-ping"></div>
+              <div className="w-3 h-3 md:w-4 md:h-4 rounded-full bg-white/30 animate-ping"></div>
             </div>
           )}
-          <Music size={24} className="z-10 drop-shadow-md" />
+          <Music size={20} className="z-10 drop-shadow-md hidden md:block" />
+          <Music size={16} className="z-10 drop-shadow-md md:hidden" />
         </div>
         <div className="flex flex-col justify-center min-w-0 flex-1">
-          <div className="text-[15px] font-bold text-white truncate hover:underline cursor-pointer tracking-tight" title={currentTrack.title}>{currentTrack.title}</div>
+          <div className="text-[13px] md:text-[15px] font-bold text-white truncate hover:underline cursor-pointer tracking-tight" title={currentTrack.title}>{currentTrack.title}</div>
         </div>
+        
+        {/* Desktop Like */}
         <button 
-          className={`transition-colors flex-shrink-0 mx-2 hover:scale-110 transform ${user?.likedTracks?.includes(currentTrackId) ? 'text-primary' : 'text-gray-400 hover:text-primary'}`}
+          className={`hidden md:block transition-colors flex-shrink-0 mx-2 hover:scale-110 transform ${user?.likedTracks?.includes(currentTrackId) ? 'text-primary' : 'text-gray-400 hover:text-primary'}`}
           onClick={toggleLike}
           aria-label="Save to Your Library"
         >
           <Heart size={18} fill={user?.likedTracks?.includes(currentTrackId) ? 'currentColor' : 'none'} />
         </button>
+
+        {/* Mobile Controls (hidden on md) */}
+        <div className="flex items-center gap-3 md:hidden flex-shrink-0">
+          <button onClick={toggleLike} className={user?.likedTracks?.includes(currentTrackId) ? 'text-primary' : 'text-gray-400'}>
+            <Heart size={16} fill={user?.likedTracks?.includes(currentTrackId) ? 'currentColor' : 'none'} />
+          </button>
+          <button onClick={togglePlay} className="w-8 h-8 flex items-center justify-center rounded-full bg-white text-black">
+            {playbackState.isPlaying ? <Pause size={14} fill="currentColor" /> : <Play size={14} fill="currentColor" className="ml-0.5" />}
+          </button>
+          <button onClick={playNext} className="text-gray-400 hover:text-white">
+            <SkipForward size={18} fill="currentColor" />
+          </button>
+        </div>
       </div>
 
       {/* CENTER: Playback Controls & Slider */}
-      <div className="flex-[2] max-w-[700px] flex flex-col items-center justify-center px-4">
+      <div className="hidden md:flex flex-[2] max-w-[700px] flex-col items-center justify-center px-4">
         <div className="flex items-center gap-6 mb-2">
           <button 
             className={`transition-colors relative ${playbackMode === 'SHUFFLE' ? 'text-primary' : 'text-gray-500 hover:text-white'}`}

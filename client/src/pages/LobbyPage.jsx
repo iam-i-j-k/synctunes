@@ -85,7 +85,7 @@ export default function LobbyPage() {
   const privateRooms = rooms.filter(r => r.isPrivate);
 
   return (
-    <div className="p-8">
+    <div className="p-4 md:p-8">
       <div className="mb-8">
         <h1 className="text-4xl font-extrabold mb-2 tracking-tight">Welcome back.</h1>
         <p className="text-base text-gray-400">
