@@ -10,5 +10,6 @@ router.put('/:id', protect, playlistController.updatePlaylist);
 router.delete('/:id', protect, playlistController.deletePlaylist);
 router.post('/:id/tracks', protect, playlistController.addTrackToPlaylist);
 router.delete('/:id/tracks/:trackId', protect, playlistController.removeTrackFromPlaylist);
+router.put('/:id/reorder', protect, playlistController.reorderPlaylist);
 
 module.exports = router;

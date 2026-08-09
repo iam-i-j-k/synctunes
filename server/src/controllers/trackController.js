@@ -45,8 +45,53 @@ async function uploadTrack(req, res) {
     }
 
     const createdTracks = [];
+    
+    let mm;
+    try {
+      mm = await import('music-metadata');
+    } catch(e) {
+      console.error("Failed to import music-metadata", e);
+    }
+
     for (const [index, file] of files.entries()) {
-      const { title } = getTrackMeta(req.body, file, index);
+      let { title } = getTrackMeta(req.body, file, index);
+      let artist = '';
+      let albumArtUrl = null;
+
+      if (mm) {
+        try {
+          const metadata = await mm.parseBuffer(file.buffer, file.mimetype);
+          
+          // Use ID3 title only if the user didn't explicitly provide one in the body
+          // The body title might just be the fallback title, let's check if it matches fallback
+          const titleValues = Array.isArray(req.body.title) ? req.body.title : req.body.title ? [req.body.title] : [];
+          const userProvidedTitle = titleValues[index] || titleValues[0];
+          
+          if (!userProvidedTitle && metadata.common.title) {
+            title = metadata.common.title.trim();
+          }
+          if (metadata.common.artist) {
+            artist = metadata.common.artist.trim();
+          }
+
+          if (metadata.common.picture && metadata.common.picture.length > 0) {
+            const picture = metadata.common.picture[0];
+            const imgUploadResult = await new Promise((resolve, reject) => {
+              const stream = cloudinary.uploader.upload_stream(
+                { resource_type: 'image', folder: 'synctunes/album-art' },
+                (error, result) => {
+                  if (error) return reject(error);
+                  resolve(result);
+                }
+              );
+              stream.end(picture.data);
+            });
+            albumArtUrl = imgUploadResult.secure_url;
+          }
+        } catch(err) {
+          console.warn('music-metadata parsing failed for', file.originalname, err.message);
+        }
+      }
 
       if (!title) {
         return res.status(400).json({ message: 'title is required for every upload' });
@@ -68,6 +113,8 @@ async function uploadTrack(req, res) {
       const track = await Track.create({
         roomId,
         title: title.trim(),
+        artist,
+        albumArtUrl,
         cloudinaryUrl: uploadResult.secure_url,
         cloudinaryPublicId: uploadResult.public_id,
         durationMs,

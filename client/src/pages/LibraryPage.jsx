@@ -6,7 +6,9 @@ import useAuthStore from '../stores/authStore';
 import AddToPlaylistModal from '../components/AddToPlaylistModal';
 import ContextMenu from '../components/ContextMenu';
 import { downloadTrack } from '../utils/downloadTrack';
-import { Download } from 'lucide-react';
+import { Download, GripVertical } from 'lucide-react';
+import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
+import { toast } from 'react-hot-toast';
 
 import useRoomStore from '../stores/roomStore';
 import usePlayerStore from '../stores/playerStore';
@@ -56,8 +58,10 @@ export default function LibraryPage() {
           socket.emit('playback:trackChange', { roomId: room._id, trackId, actionSequence: 0 });
         }, 50);
       }
+      toast.success('Track added to room queue');
     } catch (err) {
       console.error(err);
+      toast.error('Failed to add track');
     }
   }
 
@@ -70,6 +74,7 @@ export default function LibraryPage() {
       setActivePlaylist(data.playlist);
     } catch (err) {
       console.error('Failed to load playlist', err);
+      toast.error('Failed to load playlist');
     } finally {
       setLoadingPlaylist(false);
     }
@@ -82,8 +87,10 @@ export default function LibraryPage() {
       await api.delete(`/playlists/${activePlaylist._id}`);
       setPlaylists(playlists.filter(p => p._id !== activePlaylist._id));
       setActivePlaylist(null);
+      toast.success('Playlist deleted');
     } catch (err) {
       console.error('Failed to delete playlist', err);
+      toast.error('Failed to delete playlist');
     }
   }
 
@@ -95,8 +102,10 @@ export default function LibraryPage() {
         ...activePlaylist,
         trackIds: activePlaylist.trackIds.filter(t => t._id !== trackId)
       });
+      toast.success('Track removed from playlist');
     } catch (err) {
       console.error('Failed to remove track', err);
+      toast.error('Failed to remove track');
     }
   }
 
@@ -113,8 +122,10 @@ export default function LibraryPage() {
       setPlaylists([data.playlist, ...playlists]);
       setShowCreate(false);
       setCreateForm({ name: '' });
+      toast.success('Playlist created');
     } catch (err) {
       setCreateError(err.response?.data?.message || 'Failed to create playlist');
+      toast.error('Failed to create playlist');
     } finally {
       setCreating(false);
     }
@@ -127,6 +138,28 @@ export default function LibraryPage() {
       y: e.clientY,
       track
     });
+  }
+
+  async function onDragEnd(result) {
+    if (!result.destination || !activePlaylist) return;
+    const sourceIndex = result.source.index;
+    const destinationIndex = result.destination.index;
+    if (sourceIndex === destinationIndex) return;
+
+    const newTrackIds = Array.from(activePlaylist.trackIds);
+    const [reorderedItem] = newTrackIds.splice(sourceIndex, 1);
+    newTrackIds.splice(destinationIndex, 0, reorderedItem);
+
+    const updatedPlaylist = { ...activePlaylist, trackIds: newTrackIds };
+    setActivePlaylist(updatedPlaylist);
+
+    try {
+      await api.put(`/playlists/${activePlaylist._id}/reorder`, {
+        trackIds: newTrackIds.map(t => typeof t === 'object' ? t._id : t)
+      });
+    } catch (err) {
+      console.error('Failed to reorder playlist', err);
+    }
   }
 
   useEffect(() => {
@@ -345,44 +378,64 @@ export default function LibraryPage() {
                 <p>Add some songs to your playlist!</p>
               </div>
             ) : (
-              <div className="flex flex-col gap-1">
-                {activePlaylist.trackIds.map((track, i) => (
-                  <div 
-                    key={track._id} 
-                    className="flex items-center gap-4 p-3 rounded-lg hover:bg-white/5 group transition-colors cursor-pointer" 
-                    onClick={() => addAndPlayTrack(track._id)}
-                    onContextMenu={(e) => handleContextMenu(e, track)}
-                  >
-                    <div className="w-8 text-right text-gray-400 group-hover:hidden">{i + 1}</div>
-                    <div className="w-8 text-right hidden group-hover:block" onClick={(e) => { e.stopPropagation(); addAndPlayTrack(track._id); }}>
-                      <Play size={16} fill="currentColor" className="text-white" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="font-bold text-white text-[15px] truncate">{track.title}</div>
-                    </div>
-                    <button 
-                      className="p-2 text-gray-500 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleRemoveFromPlaylist(track._id);
-                      }}
-                      title="Remove from playlist"
-                    >
-                      <Trash2 size={16} />
-                    </button>
+              <DragDropContext onDragEnd={onDragEnd}>
+                <Droppable droppableId="playlist-tracks">
+                  {(provided) => (
                     <div 
-                      className="text-gray-400 hover:text-white mr-2"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSelectedTrackForPlaylist(track);
-                      }}
-                      title="Add to another playlist"
+                      className="flex flex-col gap-1"
+                      {...provided.droppableProps}
+                      ref={provided.innerRef}
                     >
-                      <Plus size={16} />
+                      {activePlaylist.trackIds.map((track, i) => (
+                        <Draggable key={track._id} draggableId={track._id} index={i}>
+                          {(provided) => (
+                            <div 
+                              ref={provided.innerRef}
+                              {...provided.draggableProps}
+                              className="flex items-center gap-4 p-3 rounded-lg hover:bg-white/5 group transition-colors cursor-pointer" 
+                              onClick={() => addAndPlayTrack(track._id)}
+                              onContextMenu={(e) => handleContextMenu(e, track)}
+                            >
+                              <div {...provided.dragHandleProps} className="text-gray-600 hover:text-white cursor-grab active:cursor-grabbing w-6 hidden group-hover:flex justify-center">
+                                <GripVertical size={16} />
+                              </div>
+                              <div className="w-8 text-right text-gray-400 group-hover:hidden">{i + 1}</div>
+                              <div className="w-8 text-right hidden group-hover:block" onClick={(e) => { e.stopPropagation(); addAndPlayTrack(track._id); }}>
+                                <Play size={16} fill="currentColor" className="text-white" />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="font-bold text-white text-[15px] truncate">{track.title}</div>
+                                {track.artist && <div className="text-[11px] text-gray-400 truncate">{track.artist}</div>}
+                              </div>
+                              <button 
+                                className="p-2 text-gray-500 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleRemoveFromPlaylist(track._id);
+                                }}
+                                title="Remove from playlist"
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                              <div 
+                                className="text-gray-400 hover:text-white mr-2"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedTrackForPlaylist(track);
+                                }}
+                                title="Add to another playlist"
+                              >
+                                <Plus size={16} />
+                              </div>
+                            </div>
+                          )}
+                        </Draggable>
+                      ))}
+                      {provided.placeholder}
                     </div>
-                  </div>
-                ))}
-              </div>
+                  )}
+                </Droppable>
+              </DragDropContext>
             )}
           </div>
         )}

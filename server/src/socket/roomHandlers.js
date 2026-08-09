@@ -88,6 +88,28 @@ function registerRoomHandlers(io, socket, roomCache) {
     handleLeave(io, socket, roomId, userId);
   });
 
+  // room:reorderTracks
+  socket.on('room:reorderTracks', async ({ roomId, trackIds }) => {
+    try {
+      let room = await Room.findById(roomId);
+      if (!room) return;
+      
+      const isMember = 
+        room.hostId.toString() === userId ||
+        room.memberIds.some((id) => id.toString() === userId);
+        
+      if (!isMember) return;
+      
+      if (Array.isArray(trackIds)) {
+        room.trackIds = trackIds;
+        await room.save();
+        io.to(`room:${roomId}`).emit('room:trackOrderChanged', { trackIds });
+      }
+    } catch (err) {
+      console.error('room:reorderTracks error:', err);
+    }
+  });
+
   // Handle disconnect — with grace period to avoid flicker on quick reconnects
   socket.on('disconnect', async () => {
     // Find all room channels this socket was in

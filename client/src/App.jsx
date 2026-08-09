@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { Toaster } from 'react-hot-toast';
 import { connectSocket } from './socket/socket';
 import useAuthStore from './stores/authStore';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -21,6 +22,18 @@ export default function App() {
 
   return (
     <BrowserRouter>
+      <Toaster 
+        position="bottom-right" 
+        toastOptions={{ 
+          style: { 
+            background: '#18181b', 
+            color: '#fff',
+            border: '1px solid rgba(255,255,255,0.1)',
+            borderRadius: '1rem',
+          },
+          success: { iconTheme: { primary: '#10b981', secondary: '#fff' } },
+        }} 
+      />
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />

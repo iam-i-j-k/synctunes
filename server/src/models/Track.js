@@ -14,6 +14,14 @@ const trackSchema = new mongoose.Schema(
       trim: true,
       maxlength: 100,
     },
+    artist: {
+      type: String,
+      trim: true,
+      maxlength: 100,
+    },
+    albumArtUrl: {
+      type: String,
+    },
     cloudinaryUrl: {
       type: String,
       required: true,

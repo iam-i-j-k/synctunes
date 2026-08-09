@@ -5,6 +5,7 @@ import api from '../api/axios';
 import socket from '../socket/socket';
 import useAuthStore from '../stores/authStore';
 import useRoomStore from '../stores/roomStore';
+import { toast } from 'react-hot-toast';
 
 export default function RoomHeader() {
   const navigate = useNavigate();
@@ -29,8 +30,10 @@ export default function RoomHeader() {
       const { data } = await api.patch(`/rooms/${currentRoom._id}`, { name: newName.trim() });
       setRoom(data.room);
       setRenaming(false);
+      toast.success('Room renamed');
     } catch (err) {
       setRenameError(err.response?.data?.message || 'Rename failed');
+      toast.error('Failed to rename room');
     }
   }
 
@@ -38,8 +41,10 @@ export default function RoomHeader() {
     try {
       await api.delete(`/rooms/${currentRoom._id}`);
       navigate('/');
+      toast.success('Room deleted');
     } catch (err) {
       console.error('Delete room failed:', err);
+      toast.error('Failed to delete room');
     }
   }
 
@@ -51,6 +56,7 @@ export default function RoomHeader() {
   function copyCode() {
     navigator.clipboard.writeText(currentRoom.joinCode).then(() => {
       setCopied(true);
+      toast.success('Copied to clipboard');
       setTimeout(() => setCopied(false), 2000);
     });
   }

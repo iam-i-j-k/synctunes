@@ -5,10 +5,12 @@ import useAuthStore from '../stores/authStore';
 import useRoomStore from '../stores/roomStore';
 import usePlayerStore from '../stores/playerStore';
 import { useState } from 'react';
+import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import AddToPlaylistModal from './AddToPlaylistModal';
 import ContextMenu from './ContextMenu';
 import { downloadTrack } from '../utils/downloadTrack';
-import { Download } from 'lucide-react';
+import { Download, GripVertical } from 'lucide-react';
+import { toast } from 'react-hot-toast';
 
 function formatMs(ms) {
   if (!ms) return '0:00';
@@ -52,9 +54,31 @@ export default function TrackList() {
     try {
       await api.delete(`/tracks/${track._id}`);
       removeTrack(track._id);
+      toast.success('Track deleted');
     } catch (err) {
       console.error('Delete track failed:', err);
+      toast.error('Failed to delete track');
     }
+  }
+
+  function onDragEnd(result) {
+    if (!result.destination) return;
+
+    const sourceIndex = result.source.index;
+    const destinationIndex = result.destination.index;
+
+    if (sourceIndex === destinationIndex) return;
+
+    const newTracks = Array.from(tracks);
+    const [reorderedItem] = newTracks.splice(sourceIndex, 1);
+    newTracks.splice(destinationIndex, 0, reorderedItem);
+
+    // Update local store immediately for optimistic UI
+    useRoomStore.getState().setTracks(newTracks);
+
+    // Emit socket event
+    const newTrackIds = newTracks.map(t => t._id);
+    socket.emit('room:reorderTracks', { roomId: currentRoom._id, trackIds: newTrackIds });
   }
 
   if (tracks.length === 0) {
@@ -67,56 +91,76 @@ export default function TrackList() {
 
   return (
     <div className="flex flex-col gap-2">
-      <ul className="flex flex-col gap-2 m-0 p-0 list-none">
-        {tracks.map((track) => {
-          const isPlaying = track._id === currentTrackId;
-          return (
-            <li
-              key={track._id}
-              onClick={() => handleSelect(track._id)}
-              onContextMenu={(e) => handleContextMenu(e, track)}
-              className={`flex items-center gap-4 p-4 rounded-xl cursor-pointer transition-all border ${isPlaying ? 'bg-primary/10 border-primary/30 shadow-[0_0_15px_rgba(30,215,96,0.1)]' : 'bg-white/5 border-white/5 hover:bg-white/10'}`}
+      <DragDropContext onDragEnd={onDragEnd}>
+        <Droppable droppableId="track-list">
+          {(provided) => (
+            <ul 
+              className="flex flex-col gap-2 m-0 p-0 list-none" 
+              {...provided.droppableProps} 
+              ref={provided.innerRef}
             >
-              <div className="flex items-center gap-4 flex-1 min-w-0">
-                <Music size={18} className={isPlaying ? 'text-primary' : 'text-gray-500'} />
-                <div className="flex flex-col min-w-0">
-                  <span className={`font-semibold text-[15px] truncate ${isPlaying ? 'text-primary' : 'text-white'}`}>
-                    {track.title}
-                  </span>
-                </div>
-              </div>
+              {tracks.map((track, index) => {
+                const isPlaying = track._id === currentTrackId;
+                return (
+                  <Draggable key={track._id} draggableId={track._id} index={index}>
+                    {(provided) => (
+                      <li
+                        ref={provided.innerRef}
+                        {...provided.draggableProps}
+                        onClick={() => handleSelect(track._id)}
+                        onContextMenu={(e) => handleContextMenu(e, track)}
+                        className={`flex items-center gap-4 p-4 rounded-xl cursor-pointer transition-all border ${isPlaying ? 'bg-primary/10 border-primary/30 shadow-[0_0_15px_rgba(30,215,96,0.1)]' : 'bg-white/5 border-white/5 hover:bg-white/10'}`}
+                      >
+                        <div {...provided.dragHandleProps} className="text-gray-600 hover:text-white cursor-grab active:cursor-grabbing">
+                          <GripVertical size={16} />
+                        </div>
+                        <div className="flex items-center gap-4 flex-1 min-w-0">
+                          <Music size={18} className={isPlaying ? 'text-primary' : 'text-gray-500'} />
+                          <div className="flex flex-col min-w-0">
+                            <span className={`font-semibold text-[15px] truncate ${isPlaying ? 'text-primary' : 'text-white'}`}>
+                              {track.title}
+                            </span>
+                            {track.artist && <span className="text-[11px] text-gray-400 truncate">{track.artist}</span>}
+                          </div>
+                        </div>
 
-              <span className="text-sm font-mono text-gray-500">{formatMs(track.durationMs)}</span>
+                        <span className="text-sm font-mono text-gray-500">{formatMs(track.durationMs)}</span>
 
-              <button
-                type="button"
-                className="p-2 text-gray-500 hover:text-white hover:bg-white/10 rounded-lg transition-colors ml-4"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setSelectedTrackForPlaylist(track);
-                }}
-                title="Add to playlist"
-              >
-                <Plus size={16} />
-              </button>
+                        <button
+                          type="button"
+                          className="p-2 text-gray-500 hover:text-white hover:bg-white/10 rounded-lg transition-colors ml-4"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedTrackForPlaylist(track);
+                          }}
+                          title="Add to playlist"
+                        >
+                          <Plus size={16} />
+                        </button>
 
-              {(track.uploadedBy === user?.id || isHost) && (
-                <button
-                  type="button"
-                  className="p-2 text-gray-500 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors ml-2"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleDelete(track);
-                  }}
-                  title="Delete track"
-                >
-                  <Trash2 size={16} />
-                </button>
-              )}
-            </li>
-          );
-        })}
-      </ul>
+                        {(track.uploadedBy === user?.id || isHost) && (
+                          <button
+                            type="button"
+                            className="p-2 text-gray-500 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors ml-2"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDelete(track);
+                            }}
+                            title="Delete track"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        )}
+                      </li>
+                    )}
+                  </Draggable>
+                );
+              })}
+              {provided.placeholder}
+            </ul>
+          )}
+        </Droppable>
+      </DragDropContext>
       {selectedTrackForPlaylist && (
         <AddToPlaylistModal 
           track={selectedTrackForPlaylist} 

@@ -109,6 +109,26 @@ async function removeTrackFromPlaylist(req, res) {
   }
 }
 
+async function reorderPlaylist(req, res) {
+  try {
+    const { trackIds } = req.body;
+    if (!Array.isArray(trackIds)) {
+      return res.status(400).json({ message: 'trackIds must be an array' });
+    }
+
+    const playlist = await Playlist.findOne({ _id: req.params.id, userId: req.user.userId });
+    if (!playlist) return res.status(404).json({ message: 'Playlist not found' });
+
+    playlist.trackIds = trackIds;
+    await playlist.save();
+
+    return res.json({ playlist });
+  } catch (err) {
+    console.error('reorderPlaylist error:', err);
+    return res.status(500).json({ message: 'Server error' });
+  }
+}
+
 module.exports = {
   createPlaylist,
   getPlaylists,
@@ -116,5 +136,6 @@ module.exports = {
   updatePlaylist,
   deletePlaylist,
   addTrackToPlaylist,
-  removeTrackFromPlaylist
+  removeTrackFromPlaylist,
+  reorderPlaylist
 };

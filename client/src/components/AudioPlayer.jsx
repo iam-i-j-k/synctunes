@@ -6,6 +6,7 @@ import useRoomStore from '../stores/roomStore';
 import useAuthStore from '../stores/authStore';
 import api from '../api/axios';
 import { useDriftCorrection } from '../hooks/useDriftCorrection';
+import { toast } from 'react-hot-toast';
 
 function formatSec(sec) {
   if (isNaN(sec) || !isFinite(sec) || sec < 0) return '0:00';
@@ -44,7 +45,10 @@ export default function AudioPlayer() {
 
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
-  const [volume, setVolume] = useState(1);
+  const [volume, setVolume] = useState(() => {
+    const saved = localStorage.getItem('synctunes_volume');
+    return saved !== null ? parseFloat(saved) : 1;
+  });
   const [seeking, setSeeking] = useState(false);
   const [seekValue, setSeekValue] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -127,7 +131,7 @@ export default function AudioPlayer() {
     }
 
     function onVolumeChange() {
-      setVolume(audio.volume);
+      // Do nothing here, we manage volume in react state
     }
 
     function onEnded() {
@@ -201,15 +205,18 @@ export default function AudioPlayer() {
   function handleVolumeChange(e) {
     const v = parseFloat(e.target.value);
     setVolume(v);
+    localStorage.setItem('synctunes_volume', v);
     if (audioRef.current) audioRef.current.volume = v;
   }
 
   function toggleMute() {
     if (volume > 0) {
       setVolume(0);
+      localStorage.setItem('synctunes_volume', 0);
       if (audioRef.current) audioRef.current.volume = 0;
     } else {
       setVolume(1);
+      localStorage.setItem('synctunes_volume', 1);
       if (audioRef.current) audioRef.current.volume = 1;
     }
   }
@@ -238,8 +245,11 @@ export default function AudioPlayer() {
       
       const { data } = await api.post(`/users/likes/${currentTrackId}`);
       updateUser({ likedTracks: data.likedTracks });
+      
+      if (!isLiked) toast.success('Saved to your Liked Songs');
     } catch (err) {
       console.error(err);
+      toast.error('Failed to update likes');
     }
   }
 
@@ -301,18 +311,19 @@ export default function AudioPlayer() {
         <div className="flex-1 min-w-0 flex items-center gap-3 md:gap-4 pr-2 md:pr-4 justify-start">
         <div 
           className="w-10 h-10 md:w-14 md:h-14 rounded-lg md:rounded-2xl flex items-center justify-center text-white/80 flex-shrink-0 shadow-[0_4px_15px_rgba(0,0,0,0.5)] relative overflow-hidden group"
-          style={{ background: stringToGradient(currentTrack.title) }}
+          style={currentTrack.albumArtUrl ? { backgroundImage: `url(${currentTrack.albumArtUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' } : { background: stringToGradient(currentTrack.title) }}
         >
           {playbackState.isPlaying && (
             <div className="absolute inset-0 bg-black/20 flex items-center justify-center">
               <div className="w-3 h-3 md:w-4 md:h-4 rounded-full bg-white/30 animate-ping"></div>
             </div>
           )}
-          <Music size={20} className="z-10 drop-shadow-md hidden md:block" />
-          <Music size={16} className="z-10 drop-shadow-md md:hidden" />
+          {!currentTrack.albumArtUrl && <Music size={20} className="z-10 drop-shadow-md hidden md:block" />}
+          {!currentTrack.albumArtUrl && <Music size={16} className="z-10 drop-shadow-md md:hidden" />}
         </div>
         <div className="flex flex-col justify-center min-w-0 flex-1">
           <div className="text-[13px] md:text-[15px] font-bold text-white truncate hover:underline cursor-pointer tracking-tight" title={currentTrack.title}>{currentTrack.title}</div>
+          {currentTrack.artist && <div className="text-[11px] md:text-xs text-gray-400 truncate">{currentTrack.artist}</div>}
         </div>
         
         {/* Desktop Like */}
@@ -473,14 +484,14 @@ export default function AudioPlayer() {
           <div className="flex-1 min-h-0 flex items-center justify-center mb-8">
             <div 
               className="w-full aspect-square max-h-[350px] max-w-[350px] rounded-2xl shadow-2xl flex items-center justify-center text-white/50 relative overflow-hidden group"
-              style={{ background: stringToGradient(currentTrack.title) }}
+              style={currentTrack.albumArtUrl ? { backgroundImage: `url(${currentTrack.albumArtUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' } : { background: stringToGradient(currentTrack.title) }}
             >
               {playbackState.isPlaying && (
                 <div className="absolute inset-0 bg-black/20 flex items-center justify-center">
                   <div className="w-8 h-8 rounded-full bg-white/20 animate-ping"></div>
                 </div>
               )}
-              <Music size={100} className="z-10 drop-shadow-xl" />
+              {!currentTrack.albumArtUrl && <Music size={100} className="z-10 drop-shadow-xl" />}
             </div>
           </div>
 
@@ -488,7 +499,7 @@ export default function AudioPlayer() {
           <div className="flex items-center justify-between mb-8">
             <div className="flex flex-col min-w-0 pr-4">
               <h2 className="text-2xl font-bold text-white truncate tracking-tight">{currentTrack.title}</h2>
-              <span className="text-gray-400 text-sm mt-1">SyncTunes Room</span>
+              <span className="text-gray-400 text-sm mt-1">{currentTrack.artist || 'SyncTunes Room'}</span>
             </div>
             <button 
               onClick={toggleLike} 
