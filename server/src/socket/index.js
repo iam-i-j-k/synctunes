@@ -9,7 +9,10 @@ const roomCache = new Map();
 function initSocket(httpServer, app) {
   const io = new Server(httpServer, {
     cors: {
-      origin: process.env.CLIENT_ORIGIN || 'http://localhost:5173',
+      origin: (origin, callback) => {
+        // Allow any origin for ease of deployment, or you can restrict this to a specific list
+        callback(null, true);
+      },
       credentials: true,
     },
   });
