@@ -81,64 +81,91 @@ export default function LobbyPage() {
     navigate('/login');
   }
 
-  return (
-    <div className="lobby-shell">
-      <div className="lobby-header">
-        <div>
-          <h1 style={{ fontSize: '1.75rem', marginBottom: '0.35rem' }}>🎵 SyncTunes</h1>
-          <p style={{ color: 'var(--color-text-muted)', fontSize: '0.95rem' }}>
-            Pick a room, invite your friends, and listen together.
-          </p>
-        </div>
+  const publicRooms = rooms.filter(r => !r.isPrivate);
+  const privateRooms = rooms.filter(r => r.isPrivate);
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
-          <span style={{ color: 'var(--color-text-muted)', fontSize: '0.95rem' }}>{user?.username}</span>
-          <button className="btn-ghost btn-small" onClick={handleLogout}>Sign Out</button>
-        </div>
+  return (
+    <div className="p-8">
+      <div className="mb-8">
+        <h1 className="text-4xl font-extrabold mb-2 tracking-tight">Welcome back.</h1>
+        <p className="text-base text-gray-400">
+          Pick a room, invite your friends, and listen together.
+        </p>
       </div>
 
-      <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem', flexWrap: 'wrap' }}>
-        <button className="btn-primary" onClick={() => setShowCreate(true)}>
+      <div className="flex flex-wrap gap-4 mb-8">
+        <button className="px-5 py-2.5 bg-gradient-to-br from-primary to-green-600 hover:from-primary-hover hover:to-green-500 text-white font-semibold rounded-xl shadow-[0_4px_15px_rgba(30,215,96,0.3)] transform hover:-translate-y-0.5 transition-all" onClick={() => setShowCreate(true)}>
           + Create Room
         </button>
 
-        <form onSubmit={handleJoin} style={{ display: 'flex', gap: '0.75rem', flex: 1, minWidth: 240, flexWrap: 'wrap' }}>
+        <form onSubmit={handleJoin} className="flex flex-wrap gap-3 flex-1 min-w-[240px]">
           <input
             placeholder="Join by code (e.g. AB12CD)"
             value={joinCode}
             onChange={(e) => { setJoinCode(e.target.value.toUpperCase()); setJoinError(''); }}
-            style={{ flex: '1 1 220px', minWidth: 220 }}
+            className="flex-1 min-w-[220px] px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50 transition-all uppercase"
             maxLength={6}
           />
-          <button type="submit" className="btn-ghost btn-small" disabled={joining}>
+          <button type="submit" className="px-5 py-2.5 bg-white/5 hover:bg-white/10 text-white font-semibold rounded-xl transition-all" disabled={joining}>
             {joining ? 'Joining…' : 'Join'}
           </button>
         </form>
-        {joinError && <span className="error-text" style={{ alignSelf: 'center' }}>{joinError}</span>}
+        {joinError && <span className="text-red-500 self-center text-sm">{joinError}</span>}
       </div>
 
-      <h2 style={{ marginBottom: '1rem', fontSize: '1rem', color: 'var(--color-text-muted)' }}>
+      {privateRooms.length > 0 && (
+        <>
+          <h2 className="mb-4 text-base font-semibold text-gray-400 uppercase tracking-wider">
+            My Private Rooms
+          </h2>
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-5 mb-8">
+            {privateRooms.map((room) => (
+              <div
+                key={room._id}
+                className="p-6 bg-white/[0.03] border border-white/5 rounded-2xl cursor-pointer hover:bg-white/[0.06] hover:border-white/10 hover:-translate-y-1.5 hover:scale-[1.02] transform transition-all duration-300 shadow-[0_4px_20px_rgba(0,0,0,0.2)] hover:shadow-[0_12px_24px_rgba(0,0,0,0.3),_0_0_20px_rgba(30,215,96,0.15)] group relative overflow-hidden"
+                onClick={() => navigate(`/room/${room._id}`)}
+              >
+                <div className="absolute top-0 right-0 bg-primary/20 text-primary text-[10px] font-bold px-2 py-1 rounded-bl-lg uppercase tracking-wider">Private</div>
+                <div className="font-bold text-lg mb-1.5 group-hover:text-primary transition-colors pr-10">{room.name}</div>
+                <div className="text-sm text-gray-400">
+                  Host: <span className="text-gray-300">{room.hostId?.username || 'Unknown'}</span> · {room.memberIds?.length || 0}/20 members
+                </div>
+                <div className="mt-3 text-xs text-gray-500 font-mono bg-black/30 inline-block px-2 py-1 rounded">
+                  Code: {room.joinCode}
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+
+      <h2 className="mb-4 text-base font-semibold text-gray-400 uppercase tracking-wider">
         Public Rooms
       </h2>
 
-      {loading && <p style={{ color: 'var(--color-text-muted)' }}>Loading rooms…</p>}
-      {error && <p className="error-text">{error}</p>}
-      {!loading && rooms.length === 0 && (
-        <p style={{ color: 'var(--color-text-muted)' }}>No public rooms yet. Create one!</p>
+      {loading && (
+        <div className="flex flex-col items-center justify-center min-h-[200px]">
+          <div className="w-10 h-10 border-4 border-white/10 border-t-primary rounded-full animate-spin mb-4"></div>
+          <p className="text-gray-400 animate-pulse font-medium">Loading rooms...</p>
+        </div>
+      )}
+      {error && <p className="text-red-500">{error}</p>}
+      {!loading && publicRooms.length === 0 && (
+        <p className="text-gray-400">No public rooms yet. Create one!</p>
       )}
 
-      <div className="card-grid">
-        {rooms.map((room) => (
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-5">
+        {publicRooms.map((room) => (
           <div
             key={room._id}
-            className="room-card"
+            className="p-6 bg-white/[0.03] border border-white/5 rounded-2xl cursor-pointer hover:bg-white/[0.06] hover:border-white/10 hover:-translate-y-1.5 hover:scale-[1.02] transform transition-all duration-300 shadow-[0_4px_20px_rgba(0,0,0,0.2)] hover:shadow-[0_12px_24px_rgba(0,0,0,0.3),_0_0_20px_rgba(30,215,96,0.15)] group"
             onClick={() => navigate(`/room/${room._id}`)}
           >
-            <div style={{ fontWeight: 700, marginBottom: '0.35rem' }}>{room.name}</div>
-            <div style={{ fontSize: '0.88rem', color: 'var(--color-text-muted)' }}>
-              Host: {room.hostId?.username || 'Unknown'} · {room.memberIds?.length || 0}/20 members
+            <div className="font-bold text-lg mb-1.5 group-hover:text-primary transition-colors">{room.name}</div>
+            <div className="text-sm text-gray-400">
+              Host: <span className="text-gray-300">{room.hostId?.username || 'Unknown'}</span> · {room.memberIds?.length || 0}/20 members
             </div>
-            <div style={{ marginTop: '0.75rem', fontSize: '0.82rem', color: 'var(--color-text-muted)', fontFamily: 'monospace' }}>
+            <div className="mt-3 text-xs text-gray-500 font-mono bg-black/30 inline-block px-2 py-1 rounded">
               Code: {room.joinCode}
             </div>
           </div>
@@ -146,38 +173,39 @@ export default function LobbyPage() {
       </div>
 
       {showCreate && (
-        <div className="modal-backdrop" onClick={(e) => { if (e.target === e.currentTarget) setShowCreate(false); }}>
-          <div className="modal-card" style={{ width: '100%', maxWidth: 420 }}>
-            <h2 style={{ marginBottom: '1.25rem', fontSize: '1.1rem' }}>Create a Room</h2>
-            <form onSubmit={handleCreate}>
-              <div className="form-group">
-                <label htmlFor="room-name">Room Name</label>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={(e) => { if (e.target === e.currentTarget) setShowCreate(false); }}>
+          <div className="w-full max-w-md bg-zinc-900 border border-white/10 rounded-2xl p-8 shadow-2xl">
+            <h2 className="mb-6 text-xl font-bold">Create a Room</h2>
+            <form onSubmit={handleCreate} className="flex flex-col gap-4">
+              <div className="flex flex-col gap-2">
+                <label htmlFor="room-name" className="text-sm font-medium text-gray-300">Room Name</label>
                 <input
                   id="room-name"
                   maxLength={50}
                   value={createForm.name}
                   onChange={(e) => setCreateForm((f) => ({ ...f, name: e.target.value }))}
                   autoFocus
+                  className="w-full px-4 py-2.5 bg-black/20 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50 transition-all"
                 />
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
+              <div className="flex items-center gap-3 mb-2">
                 <input
                   id="is-private"
                   type="checkbox"
-                  style={{ width: 'auto' }}
+                  className="w-4 h-4 rounded text-primary focus:ring-primary border-gray-300 bg-gray-100"
                   checked={createForm.isPrivate}
                   onChange={(e) => setCreateForm((f) => ({ ...f, isPrivate: e.target.checked }))}
                 />
-                <label htmlFor="is-private" style={{ color: 'var(--color-text)', fontSize: '0.9rem', cursor: 'pointer' }}>
+                <label htmlFor="is-private" className="text-sm text-gray-300 cursor-pointer select-none">
                   Private room
                 </label>
               </div>
-              {createError && <p className="error-text" style={{ marginBottom: '0.75rem' }}>{createError}</p>}
-              <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-                <button type="submit" className="btn-primary" disabled={creating}>
+              {createError && <p className="text-red-500 text-sm">{createError}</p>}
+              <div className="flex gap-3 mt-2">
+                <button type="submit" className="flex-1 py-2.5 bg-gradient-to-br from-primary to-green-600 hover:from-primary-hover hover:to-green-500 text-white font-semibold rounded-xl shadow-lg transition-all" disabled={creating}>
                   {creating ? 'Creating…' : 'Create'}
                 </button>
-                <button type="button" className="btn-ghost" onClick={() => setShowCreate(false)}>
+                <button type="button" className="flex-1 py-2.5 bg-white/5 hover:bg-white/10 text-white font-semibold rounded-xl transition-all" onClick={() => setShowCreate(false)}>
                   Cancel
                 </button>
               </div>

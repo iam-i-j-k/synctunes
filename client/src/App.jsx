@@ -7,6 +7,8 @@ import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import LobbyPage from './pages/LobbyPage';
 import RoomPage from './pages/RoomPage';
+import LibraryPage from './pages/LibraryPage';
+import Layout from './components/Layout';
 
 export default function App() {
   const token = useAuthStore((s) => s.token);
@@ -23,21 +25,16 @@ export default function App() {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
         <Route
-          path="/"
           element={
             <ProtectedRoute>
-              <LobbyPage />
+              <Layout />
             </ProtectedRoute>
           }
-        />
-        <Route
-          path="/room/:id"
-          element={
-            <ProtectedRoute>
-              <RoomPage />
-            </ProtectedRoute>
-          }
-        />
+        >
+          <Route path="/" element={<LobbyPage />} />
+          <Route path="/room/:id" element={<RoomPage />} />
+          <Route path="/library/:tab" element={<LibraryPage />} />
+        </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>

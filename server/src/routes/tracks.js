@@ -1,7 +1,7 @@
 const express = require('express');
 const { protect } = require('../middleware/auth');
 const { uploadAudio } = require('../middleware/upload');
-const { uploadTrack, listTracks, deleteTrack } = require('../controllers/trackController');
+const { uploadTrack, listTracks, deleteTrack, addExistingTrack } = require('../controllers/trackController');
 
 const router = express.Router();
 
@@ -10,6 +10,7 @@ router.use(protect);
 // Scoped under rooms (mounted at /api)
 router.get('/rooms/:roomId/tracks', listTracks);
 router.post('/rooms/:roomId/tracks', uploadAudio, uploadTrack);
+router.post('/rooms/:roomId/tracks/add-existing', addExistingTrack);
 router.delete('/tracks/:id', deleteTrack);
 
 module.exports = router;

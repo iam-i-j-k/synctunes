@@ -11,6 +11,8 @@ const { initSocket } = require('./socket');
 const authRoutes = require('./routes/auth');
 const roomRoutes = require('./routes/rooms');
 const trackRoutes = require('./routes/tracks');
+const userRoutes = require('./routes/users');
+const playlistRoutes = require('./routes/playlists');
 
 const app = express();
 const server = http.createServer(app);
@@ -26,7 +28,9 @@ app.use(express.json());
 // ── Routes ───────────────────────────────────────────────────────────────────
 app.use('/api/auth', authRoutes);
 app.use('/api/rooms', roomRoutes);
-app.use('/api', trackRoutes); // track routes include /rooms/:roomId/tracks and /tracks/:id
+app.use('/api', trackRoutes);
+app.use('/api/users', userRoutes);
+app.use('/api/playlists', playlistRoutes);
 
 app.get('/api/health', (_req, res) => res.json({ status: 'ok' }));
 

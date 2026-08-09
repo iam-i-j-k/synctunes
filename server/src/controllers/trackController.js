@@ -4,7 +4,6 @@ const Room = require('../models/Room');
 
 function getTrackMeta(body, file, index) {
   const titleValues = Array.isArray(body.title) ? body.title : body.title ? [body.title] : [];
-  const artistValues = Array.isArray(body.artist) ? body.artist : body.artist ? [body.artist] : [];
 
   const fallbackTitle = file.originalname
     .replace(/\.[^.]+$/, '')
@@ -12,9 +11,8 @@ function getTrackMeta(body, file, index) {
     .trim();
 
   const title = (titleValues[index] || titleValues[0] || fallbackTitle || 'Untitled').trim();
-  const artist = (artistValues[index] || artistValues[0] || 'Unknown Artist').trim();
 
-  return { title, artist };
+  return { title };
 }
 
 // Upload one or more audio files to Cloudinary and save Track docs
@@ -48,10 +46,10 @@ async function uploadTrack(req, res) {
 
     const createdTracks = [];
     for (const [index, file] of files.entries()) {
-      const { title, artist } = getTrackMeta(req.body, file, index);
+      const { title } = getTrackMeta(req.body, file, index);
 
-      if (!title || !artist) {
-        return res.status(400).json({ message: 'title and artist are required for every upload' });
+      if (!title) {
+        return res.status(400).json({ message: 'title is required for every upload' });
       }
 
       const uploadResult = await new Promise((resolve, reject) => {
@@ -70,7 +68,6 @@ async function uploadTrack(req, res) {
       const track = await Track.create({
         roomId,
         title: title.trim(),
-        artist: artist.trim(),
         cloudinaryUrl: uploadResult.secure_url,
         cloudinaryPublicId: uploadResult.public_id,
         durationMs,
@@ -78,12 +75,15 @@ async function uploadTrack(req, res) {
       });
 
       createdTracks.push(track);
+      room.trackIds.push(track._id);
 
       const io = req.app.locals.io;
       if (io) {
         io.to(`room:${roomId}`).emit('room:trackAdded', { track });
       }
     }
+
+    await room.save();
 
     return res.status(201).json({
       tracks: createdTracks,
@@ -106,7 +106,9 @@ async function listTracks(req, res) {
       room.memberIds.some((id) => id.toString() === req.user.userId);
     if (!isMember) return res.status(403).json({ message: 'You are not a member of this room' });
 
-    const tracks = await Track.find({ roomId }).sort({ createdAt: 1 });
+    const tracks = await Track.find({
+      $or: [{ roomId }, { _id: { $in: room.trackIds || [] } }],
+    }).sort({ createdAt: 1 });
     return res.json({ tracks });
   } catch (err) {
     console.error('listTracks error:', err);
@@ -154,4 +156,36 @@ async function deleteTrack(req, res) {
   }
 }
 
-module.exports = { uploadTrack, listTracks, deleteTrack };
+async function addExistingTrack(req, res) {
+  try {
+    const { roomId } = req.params;
+    const { trackId } = req.body;
+
+    const room = await Room.findById(roomId);
+    if (!room) return res.status(404).json({ message: 'Room not found' });
+    const isMember =
+      room.hostId.toString() === req.user.userId ||
+      room.memberIds.some((id) => id.toString() === req.user.userId);
+    if (!isMember) return res.status(403).json({ message: 'You are not a member of this room' });
+
+    const track = await Track.findById(trackId);
+    if (!track) return res.status(404).json({ message: 'Track not found' });
+
+    if (!room.trackIds.includes(track._id)) {
+      room.trackIds.push(track._id);
+      await room.save();
+      
+      const io = req.app.locals.io;
+      if (io) {
+        io.to(`room:${roomId}`).emit('room:trackAdded', { track });
+      }
+    }
+
+    return res.json({ track });
+  } catch (err) {
+    console.error('addExistingTrack error:', err);
+    return res.status(500).json({ message: 'Server error' });
+  }
+}
+
+module.exports = { uploadTrack, listTracks, deleteTrack, addExistingTrack };

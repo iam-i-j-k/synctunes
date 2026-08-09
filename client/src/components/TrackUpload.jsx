@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import { Plus, UploadCloud, X, Music, Check } from 'lucide-react';
 import api from '../api/axios';
 import useRoomStore from '../stores/roomStore';
 
@@ -10,7 +11,7 @@ export default function TrackUpload() {
   const fileRef = useRef(null);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
-  // Array of { id, file, title, artist, progress, status: 'pending'|'uploading'|'success'|'error', errorMsg }
+  // Array of { id, file, title, progress, status: 'pending'|'uploading'|'success'|'error', errorMsg }
   const [uploadItems, setUploadItems] = useState([]);
   const [dragActive, setDragActive] = useState(false);
   const [globalError, setGlobalError] = useState('');
@@ -49,7 +50,6 @@ export default function TrackUpload() {
           id: Math.random().toString(36).substring(7),
           file: f,
           title: name,
-          artist: '',
           progress: 0,
           status: 'pending',
           errorMsg: '',
@@ -113,8 +113,8 @@ export default function TrackUpload() {
     // Validate inputs before uploading
     let validationFailed = false;
     pendingItems.forEach(item => {
-      if (!item.title.trim() || !item.artist.trim()) {
-        updateItem(item.id, 'errorMsg', 'Title and artist are required');
+      if (!item.title.trim()) {
+        updateItem(item.id, 'errorMsg', 'Title is required');
         updateItem(item.id, 'status', 'error');
         validationFailed = true;
       }
@@ -130,7 +130,6 @@ export default function TrackUpload() {
       const fd = new FormData();
       fd.append('audio', item.file);
       fd.append('title', item.title.trim());
-      fd.append('artist', item.artist.trim());
 
       try {
         const { data } = await api.post(`/rooms/${currentRoom._id}/tracks`, fd, {
@@ -153,48 +152,42 @@ export default function TrackUpload() {
   const allSuccess = uploadItems.length > 0 && uploadItems.every(item => item.status === 'success');
 
   return (
-    <div style={{ padding: '0 1.2rem 1rem 1.2rem' }}>
+    <div className="px-5 pb-4">
       <button 
-        className="btn-ghost" 
+        className="w-full py-4 px-6 border-2 border-dashed border-white/20 rounded-xl bg-white/5 hover:bg-white/10 text-white font-semibold flex items-center justify-center gap-2 transition-all hover:border-primary/50 group" 
         onClick={() => setIsModalOpen(true)}
-        style={{ width: '100%', padding: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', borderStyle: 'dashed' }}
       >
-        <svg role="img" height="16" width="16" viewBox="0 0 16 16" fill="currentColor">
-          <path d="M15.25 8a.75.75 0 0 1-.75.75H8.75v5.75a.75.75 0 0 1-1.5 0V8.75H1.5a.75.75 0 0 1 0-1.5h5.75V1.5a.75.75 0 0 1 1.5 0v5.75h5.75a.75.75 0 0 1 .75.75z"></path>
-        </svg>
-        Add Track
+        <Plus size={16} className="text-gray-400 group-hover:text-primary transition-colors" />
+        <span className="group-hover:text-primary transition-colors">Add Track</span>
       </button>
 
       {isModalOpen && (
-        <div className="modal-backdrop" onClick={!isUploading ? closeModal : undefined} style={{ zIndex: 9999 }}>
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-md p-4" onClick={!isUploading ? closeModal : undefined}>
           <div 
-            className="modal-card" 
-            style={{ width: '100%', maxWidth: '600px', padding: '1.5rem', background: '#181818', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }} 
+            className="w-full max-w-2xl bg-zinc-900 border border-white/10 rounded-2xl p-6 flex flex-col max-h-[90vh] shadow-2xl" 
             onClick={e => e.stopPropagation()}
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexShrink: 0 }}>
-              <h3 style={{ fontSize: '1.2rem', fontWeight: 600, color: 'var(--color-text)' }}>
+            <div className="flex justify-between items-center mb-5 flex-shrink-0">
+              <h3 className="text-xl font-bold text-white">
                 Add to Playlist
               </h3>
               <button 
-                className="btn-ghost" 
+                className={`p-2 rounded-lg bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white transition-colors ${isUploading ? 'invisible' : 'visible'}`} 
                 onClick={closeModal}
-                style={{ padding: '0.4rem', border: 'none', background: 'transparent', visibility: isUploading ? 'hidden' : 'visible' }}
                 aria-label="Close"
               >
-                ✕
+                <X size={20} />
               </button>
             </div>
             
             {uploadItems.length === 0 ? (
               <div 
-                className={`upload-zone ${dragActive ? 'drag-active' : ''}`}
+                className={`flex flex-col items-center justify-center p-10 border-2 border-dashed rounded-xl transition-all cursor-pointer flex-1 ${dragActive ? 'border-primary bg-primary/5' : 'border-white/20 hover:border-white/40 hover:bg-white/5'}`}
                 onDragEnter={handleDrag}
                 onDragLeave={handleDrag}
                 onDragOver={handleDrag}
                 onDrop={handleDrop}
                 onClick={handleZoneClick}
-                style={{ marginBottom: 0, flex: 1 }}
               >
                 <input
                   ref={fileRef}
@@ -202,90 +195,80 @@ export default function TrackUpload() {
                   accept=".mp3,.wav,.m4a"
                   onChange={handleFileChange}
                   multiple
-                  style={{ display: 'none' }}
+                  className="hidden"
                 />
-                <svg className="upload-icon" role="img" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4 11h-3v5h-2v-5H8l4-4 4 4z"></path>
-                </svg>
-                <div className="upload-text">Click or drag audio files here</div>
-                <div className="upload-hint">Supports multiple MP3, WAV, M4A (Max 15MB each)</div>
+                <UploadCloud size={48} className="text-primary mb-4" />
+                <div className="text-lg font-semibold text-white mb-2">Click or drag audio files here</div>
+                <div className="text-sm text-gray-400">Supports multiple MP3, WAV, M4A (Max 15MB each)</div>
               </div>
             ) : (
-              <form onSubmit={handleUploadAll} className="upload-form-inputs" style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', overflowY: 'auto', paddingRight: '0.5rem', flex: 1 }}>
+              <form onSubmit={handleUploadAll} className="flex flex-col flex-1 overflow-hidden">
+                <div className="flex flex-col gap-4 overflow-y-auto pr-2 flex-1 custom-scrollbar">
                   {uploadItems.map((item) => (
-                    <div key={item.id} style={{ background: 'rgba(255,255,255,0.04)', borderRadius: '12px', padding: '1rem', position: 'relative' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
-                        <div style={{ width: 40, height: 40, borderRadius: 8, background: 'var(--color-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#000', flexShrink: 0 }}>
-                          ♪
+                    <div key={item.id} className="bg-white/[0.04] rounded-xl p-4 relative border border-white/5">
+                      <div className="flex items-center gap-4 mb-4">
+                        <div className="w-10 h-10 rounded-lg bg-primary/20 text-primary flex items-center justify-center flex-shrink-0">
+                          <Music size={20} />
                         </div>
-                        <div style={{ minWidth: 0, flex: 1 }}>
-                          <div style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--color-text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        <div className="min-w-0 flex-1">
+                          <div className="text-sm font-semibold text-white truncate">
                             {item.file.name}
                           </div>
-                          <div style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>
+                          <div className="text-xs text-gray-400">
                             {(item.file.size / 1024 / 1024).toFixed(2)} MB
                           </div>
                         </div>
                         {item.status !== 'uploading' && item.status !== 'success' && (
                           <button 
                             type="button" 
-                            className="btn-ghost btn-small" 
+                            className="px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-lg text-sm font-semibold transition-colors border border-red-500/20" 
                             onClick={() => removeItem(item.id)}
-                            style={{ padding: '0.4rem 0.6rem' }}
                           >
                             Remove
                           </button>
                         )}
                         {item.status === 'success' && (
-                          <span style={{ color: 'var(--color-primary)', fontSize: '0.9rem', fontWeight: 600 }}>✓ Done</span>
+                          <span className="flex items-center gap-1 text-primary text-sm font-bold">
+                            <Check size={16} /> Done
+                          </span>
                         )}
                       </div>
 
-                      <div className="upload-form-row">
+                      <div className="grid grid-cols-1 gap-3">
                         <input
                           placeholder="Title"
                           value={item.title}
                           onChange={(e) => updateItem(item.id, 'title', e.target.value)}
                           maxLength={100}
                           disabled={item.status === 'uploading' || item.status === 'success'}
-                          style={{ borderColor: item.errorMsg ? 'var(--color-danger)' : undefined }}
-                        />
-                        <input
-                          placeholder="Artist"
-                          value={item.artist}
-                          onChange={(e) => updateItem(item.id, 'artist', e.target.value)}
-                          maxLength={100}
-                          disabled={item.status === 'uploading' || item.status === 'success'}
-                          style={{ borderColor: item.errorMsg ? 'var(--color-danger)' : undefined }}
+                          className={`w-full px-3 py-2 bg-black/20 border ${item.errorMsg ? 'border-red-500' : 'border-white/10'} rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-primary/50 disabled:opacity-50 transition-colors`}
                         />
                       </div>
                       
                       {item.errorMsg && (
-                        <div style={{ color: 'var(--color-danger)', fontSize: '0.8rem', marginTop: '0.5rem' }}>
+                        <div className="text-red-500 text-xs mt-2">
                           {item.errorMsg}
                         </div>
                       )}
 
                       {item.status === 'uploading' && (
-                        <div style={{ height: 4, background: 'rgba(255,255,255,0.1)', borderRadius: 2, overflow: 'hidden', marginTop: '1rem' }}>
-                          <div style={{ height: '100%', width: `${item.progress}%`, background: 'var(--color-primary)', transition: 'width 0.2s' }} />
+                        <div className="h-1.5 bg-white/10 rounded-full overflow-hidden mt-4">
+                          <div className="h-full bg-primary transition-all duration-200" style={{ width: `${item.progress}%` }} />
                         </div>
                       )}
                     </div>
                   ))}
                 </div>
 
-                <div style={{ flexShrink: 0, marginTop: '1rem' }}>
+                <div className="flex-shrink-0 mt-4 border-t border-white/10 pt-4">
                   {!allSuccess && (
                     <div 
-                      className={`upload-zone ${dragActive ? 'drag-active' : ''}`}
+                      className={`flex items-center justify-center p-3 mb-4 border-2 border-dashed rounded-xl cursor-pointer transition-colors ${dragActive ? 'border-primary bg-primary/5' : 'border-white/20 hover:border-white/40 hover:bg-white/5'}`}
                       onDragEnter={handleDrag}
                       onDragLeave={handleDrag}
                       onDragOver={handleDrag}
                       onDrop={handleDrop}
                       onClick={handleZoneClick}
-                      style={{ padding: '1rem', borderStyle: 'dashed', background: 'transparent', marginBottom: '1rem' }}
                     >
                       <input
                         ref={fileRef}
@@ -293,17 +276,16 @@ export default function TrackUpload() {
                         accept=".mp3,.wav,.m4a"
                         onChange={handleFileChange}
                         multiple
-                        style={{ display: 'none' }}
+                        className="hidden"
                       />
-                      <span style={{ color: 'var(--color-text-muted)', fontSize: '0.9rem' }}>+ Add more files</span>
+                      <span className="text-gray-400 text-sm font-medium">+ Add more files</span>
                     </div>
                   )}
 
                   <button 
                     type="submit" 
-                    className="btn-primary" 
                     disabled={isUploading || uploadItems.every(i => i.status === 'success')} 
-                    style={{ padding: '0.8rem', width: '100%' }}
+                    className="w-full py-3.5 bg-gradient-to-br from-primary to-green-600 hover:from-primary-hover hover:to-green-500 text-white font-semibold rounded-xl shadow-lg transition-all disabled:opacity-50 disabled:pointer-events-none"
                   >
                     {isUploading ? 'Uploading...' : allSuccess ? 'All Uploads Complete' : 'Upload All Tracks'}
                   </button>
@@ -311,7 +293,7 @@ export default function TrackUpload() {
               </form>
             )}
 
-            {globalError && <div className="error-text" style={{ marginTop: '1rem', textAlign: 'center', flexShrink: 0 }}>{globalError}</div>}
+            {globalError && <div className="text-red-500 text-center mt-4 text-sm font-medium flex-shrink-0">{globalError}</div>}
           </div>
         </div>
       )}

@@ -10,13 +10,12 @@ import RoomHeader from '../components/RoomHeader';
 import MemberList from '../components/MemberList';
 import TrackList from '../components/TrackList';
 import TrackUpload from '../components/TrackUpload';
-import AudioPlayer from '../components/AudioPlayer';
 
 export default function RoomPage() {
   const { id: roomId } = useParams();
   const navigate = useNavigate();
   const { setRoom, setMembers, setTracks, addTrack, removeTrack, clearRoom } = useRoomStore();
-  const { applyPlaybackUpdate } = usePlayerStore();
+  const { applyPlaybackUpdate, clearPlayer } = usePlayerStore();
   const [loadingRoom, setLoadingRoom] = useState(true);
   const [roomError, setRoomError] = useState('');
 
@@ -28,15 +27,14 @@ export default function RoomPage() {
     setLoadingRoom(true);
     setRoomError('');
 
-    function onRoomState({ room, members, actionSequence }) {
-      setRoom(room);
-      setMembers(members);
-      applyPlaybackUpdate(room.playbackState, actionSequence, room.currentTrackId);
+    function onRoomState({ room }) {
+      setRoomError('');
       setLoadingRoom(false);
-
       api
         .get(`/rooms/${roomId}/tracks`)
-        .then(({ data }) => setTracks(data.tracks))
+        .then(({ data }) => {
+          setTracks(data.tracks);
+        })
         .catch((err) => {
           console.error(err);
           setRoomError('Unable to load room tracks.');
@@ -64,107 +62,42 @@ export default function RoomPage() {
       socket.emit('room:join', { roomId });
     }
 
-
-
-    function onMemberUpdate({ members }) {
-      setMembers(members);
-    }
-
-    function onKicked({ roomId: kickedFrom }) {
-      if (kickedFrom.toString() === roomId) {
-        clearRoom();
-        navigate('/');
-      }
-    }
-
-    function onRoomDeleted() {
-      clearRoom();
-      navigate('/');
-    }
-
-    function onRoomUpdated({ name }) {
-      setRoom((prev) => (prev ? { ...prev, name } : prev));
-    }
-
-    function onTrackAdded({ track }) {
-      addTrack(track);
-    }
-
-    function onTrackRemoved({ trackId }) {
-      removeTrack(trackId);
-    }
-
-    function onPlaybackUpdate({ playbackState, actionSequence, currentTrackId }) {
-      applyPlaybackUpdate(playbackState, actionSequence, currentTrackId);
-    }
-
-    function onStaleAction({ currentState, actionSequence }) {
-      applyPlaybackUpdate(currentState.playbackState, actionSequence, currentState.currentTrackId);
-    }
-
-    socket.on('room:state', onRoomState);
-    socket.on('room:joinError', onRoomStateError);
-    socket.on('room:memberUpdate', onMemberUpdate);
-    socket.on('room:kicked', onKicked);
-    socket.on('room:deleted', onRoomDeleted);
-    socket.on('room:updated', onRoomUpdated);
-    socket.on('room:trackAdded', onTrackAdded);
-    socket.on('room:trackRemoved', onTrackRemoved);
-    socket.on('playback:update', onPlaybackUpdate);
-    socket.on('room:staleAction', onStaleAction);
-
-    function onConnect() {
-      socket.emit('room:join', { roomId });
-    }
-    socket.on('connect', onConnect);
-
     return () => {
-      socket.emit('room:leave', { roomId });
       socket.off('room:state', onRoomState);
       socket.off('room:joinError', onRoomStateError);
-      socket.off('room:memberUpdate', onMemberUpdate);
-      socket.off('room:kicked', onKicked);
-      socket.off('room:deleted', onRoomDeleted);
-      socket.off('room:updated', onRoomUpdated);
-      socket.off('room:trackAdded', onTrackAdded);
-      socket.off('room:trackRemoved', onTrackRemoved);
-      socket.off('playback:update', onPlaybackUpdate);
-      socket.off('room:staleAction', onStaleAction);
       socket.off('connect', onConnect);
-      clearRoom();
     };
   }, [roomId]);
 
   return (
-    <div className="app-shell">
-      <RoomHeader />
+    <div className="flex flex-col xl:flex-row h-full">
+      <main className="flex-1 flex flex-col min-w-0">
+        <RoomHeader />
 
-      <div className="room-grid" style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
-        <aside className="sidebar">
-          <MemberList />
-        </aside>
-
-        <main className="main-content">
-          {roomError ? (
-            <div className="room-card" style={{ margin: '1rem', color: 'var(--color-text-muted)' }}>
-              {roomError}
-            </div>
-          ) : loadingRoom ? (
-            <div className="room-card" style={{ margin: '1rem', color: 'var(--color-text-muted)' }}>
-              Loading room…
-            </div>
-          ) : (
-            <>
-              <div style={{ flex: 1, overflowY: 'auto' }}>
-                <TrackList />
-              </div>
-
+        {roomError ? (
+          <div className="p-6 m-4 bg-red-500/10 border border-red-500/20 rounded-2xl text-red-400 flex items-center justify-center min-h-[200px]">
+            {roomError}
+          </div>
+        ) : loadingRoom ? (
+          <div className="flex-1 flex flex-col items-center justify-center min-h-[300px]">
+            <div className="w-10 h-10 border-4 border-white/10 border-t-primary rounded-full animate-spin mb-4"></div>
+            <p className="text-gray-400 animate-pulse font-medium">Entering Room...</p>
+          </div>
+        ) : (
+          <>
+            <div className="px-6 pt-6">
               <TrackUpload />
-              <AudioPlayer />
-            </>
-          )}
-        </main>
-      </div>
+            </div>
+            <div className="flex-1 overflow-y-auto px-6 pb-6">
+              <TrackList />
+            </div>
+          </>
+        )}
+      </main>
+
+      <aside className="w-full xl:w-[320px] bg-zinc-950 border-t xl:border-t-0 xl:border-l border-white/5 flex-shrink-0 flex flex-col xl:h-full max-h-[300px] xl:max-h-full overflow-y-auto">
+        <MemberList />
+      </aside>
     </div>
   );
 }

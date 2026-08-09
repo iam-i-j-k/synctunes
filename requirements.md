@@ -72,7 +72,7 @@ The following four known ambiguities are resolved here with explicit assumptions
 
 ### FR-3 Track Management
 
-**FR-3.1** WHEN an authenticated room member submits an audio file upload (mp3, wav, or m4a, ≤15 MB), the system SHALL validate format and size at the multer layer before touching Cloudinary, upload to Cloudinary with `resource_type: "video"`, create a Track document with `{ title, artist, cloudinaryUrl, cloudinaryPublicId, durationMs, uploadedBy }`, and return the Track object.
+**FR-3.1** WHEN an authenticated room member submits an audio file upload (mp3, wav, or m4a, ≤15 MB), the system SHALL validate format and size at the multer layer before touching Cloudinary, upload to Cloudinary with `resource_type: "video"`, create a Track document with `{ title, cloudinaryUrl, cloudinaryPublicId, durationMs, uploadedBy }`, and return the Track object.
 
 **FR-3.2** WHEN an upload is rejected because the file exceeds 15 MB or has a disallowed format, the system SHALL return HTTP 400 with a descriptive error and SHALL NOT contact Cloudinary.
 

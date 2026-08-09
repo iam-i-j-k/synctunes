@@ -16,7 +16,10 @@ const useRoomStore = create((set) => ({
   setTracks: (tracks) => set({ tracks }),
 
   addTrack: (track) =>
-    set((state) => ({ tracks: [...state.tracks, track] })),
+    set((state) => {
+      if (state.tracks.some(t => t._id === track._id)) return state;
+      return { tracks: [...state.tracks, track] };
+    }),
 
   removeTrack: (trackId) =>
     set((state) => ({

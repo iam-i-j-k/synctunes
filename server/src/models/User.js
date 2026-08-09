@@ -19,8 +19,22 @@ const userSchema = new mongoose.Schema(
     },
     passwordHash: {
       type: String,
-      required: true,
+      // Optional for OAuth users
     },
+    googleId: {
+      type: String,
+      unique: true,
+      sparse: true,
+    },
+    avatarUrl: {
+      type: String,
+    },
+    likedTracks: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Track',
+      },
+    ],
   },
   { timestamps: true }
 );

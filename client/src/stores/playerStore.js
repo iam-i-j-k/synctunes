@@ -8,10 +8,28 @@ const usePlayerStore = create((set, get) => ({
   },
   actionSequence: 0,
   currentTrackId: null,
+  playbackMode: 'NORMAL',
   serverTimeOffset: 0, // NTP-derived offset: add to Date.now() to get server time
 
-  applyPlaybackUpdate: (playbackState, actionSequence, currentTrackId) =>
-    set({ playbackState, actionSequence, currentTrackId }),
+  applyPlaybackUpdate: (playbackState, actionSequence, currentTrackId, playbackMode) =>
+    set((state) => ({
+      playbackState,
+      actionSequence,
+      currentTrackId,
+      playbackMode: playbackMode !== undefined ? playbackMode : state.playbackMode,
+    })),
+
+  clearPlayer: () =>
+    set({
+      playbackState: {
+        isPlaying: false,
+        startedAtServerTime: 0,
+        pausedAtOffsetMs: 0,
+      },
+      actionSequence: 0,
+      currentTrackId: null,
+      playbackMode: 'NORMAL',
+    }),
 
   setClockOffset: (offset) => set({ serverTimeOffset: offset }),
 

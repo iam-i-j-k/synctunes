@@ -16,6 +16,7 @@ function registerPlaybackHandlers(io, socket, roomCache) {
       },
       actionSequence: room.actionSequence,
       currentTrackId: room.currentTrackId ? room.currentTrackId.toString() : null,
+      playbackMode: room.playbackMode || 'NORMAL',
     };
     roomCache.set(roomId, state);
     return state;
@@ -29,6 +30,7 @@ function registerPlaybackHandlers(io, socket, roomCache) {
       'playbackState.pausedAtOffsetMs': state.playbackState.pausedAtOffsetMs,
       actionSequence: state.actionSequence,
       currentTrackId: state.currentTrackId,
+      playbackMode: state.playbackMode,
     }).catch((err) => console.error('persistState error:', err));
   }
 
@@ -38,6 +40,7 @@ function registerPlaybackHandlers(io, socket, roomCache) {
       currentState: {
         playbackState: state.playbackState,
         currentTrackId: state.currentTrackId,
+        playbackMode: state.playbackMode,
       },
       actionSequence: state.actionSequence,
     });
@@ -49,6 +52,7 @@ function registerPlaybackHandlers(io, socket, roomCache) {
       playbackState: state.playbackState,
       actionSequence: state.actionSequence,
       currentTrackId: state.currentTrackId,
+      playbackMode: state.playbackMode,
     });
   }
 
@@ -62,7 +66,8 @@ function registerPlaybackHandlers(io, socket, roomCache) {
       return rejectStale(socket, state);
     }
 
-    state.playbackState.startedAtServerTime = Date.now();
+    const offset = state.playbackState.pausedAtOffsetMs || 0;
+    state.playbackState.startedAtServerTime = Date.now() - offset;
     state.playbackState.isPlaying = true;
     state.actionSequence += 1;
 
@@ -119,7 +124,7 @@ function registerPlaybackHandlers(io, socket, roomCache) {
     }
 
     state.currentTrackId = trackId;
-    state.playbackState = { isPlaying: false, startedAtServerTime: 0, pausedAtOffsetMs: 0 };
+    state.playbackState = { isPlaying: true, startedAtServerTime: Date.now(), pausedAtOffsetMs: 0 };
     state.actionSequence += 1;
 
     persistState(roomId, state);
@@ -137,6 +142,117 @@ function registerPlaybackHandlers(io, socket, roomCache) {
       actionSequence: state.actionSequence,
       serverTime: Date.now(),
     });
+  });
+
+  // ── playback:mode ──────────────────────────────────────────────────────────
+  socket.on('playback:mode', async ({ roomId, mode, actionSequence }) => {
+    const state = await getState(roomId);
+    if (!state) return;
+
+    if (actionSequence !== state.actionSequence) {
+      return rejectStale(socket, state);
+    }
+
+    state.playbackMode = mode;
+    state.actionSequence += 1;
+    persistState(roomId, state);
+    broadcast(roomId, state);
+  });
+
+  // ── playback:next ──────────────────────────────────────────────────────────
+  socket.on('playback:next', async ({ roomId, actionSequence }) => {
+    const state = await getState(roomId);
+    if (!state) return;
+
+    if (actionSequence !== state.actionSequence) {
+      return rejectStale(socket, state);
+    }
+
+    const room = await Room.findById(roomId);
+    if (!room || room.trackIds.length === 0) return;
+
+    const trackIds = room.trackIds.map((id) => id.toString());
+    const currentIndex = trackIds.indexOf(state.currentTrackId);
+    let nextIndex = 0;
+
+    if (state.playbackMode === 'REPEAT_ONE') {
+      nextIndex = currentIndex !== -1 ? currentIndex : 0;
+    } else if (state.playbackMode === 'SHUFFLE') {
+      nextIndex = Math.floor(Math.random() * trackIds.length);
+    } else {
+      nextIndex = currentIndex + 1;
+      if (nextIndex >= trackIds.length) {
+        if (state.playbackMode === 'REPEAT_ALL') {
+          nextIndex = 0;
+        } else {
+          // NORMAL: Stop playback if at end
+          state.playbackState = { isPlaying: false, startedAtServerTime: 0, pausedAtOffsetMs: 0 };
+          state.actionSequence += 1;
+          persistState(roomId, state);
+          return broadcast(roomId, state);
+        }
+      }
+    }
+
+    state.currentTrackId = trackIds[nextIndex];
+    state.playbackState = { isPlaying: true, startedAtServerTime: Date.now(), pausedAtOffsetMs: 0 };
+    state.actionSequence += 1;
+
+    persistState(roomId, state);
+    broadcast(roomId, state);
+  });
+
+  // ── playback:prev ──────────────────────────────────────────────────────────
+  socket.on('playback:prev', async ({ roomId, actionSequence }) => {
+    const state = await getState(roomId);
+    if (!state) return;
+
+    if (actionSequence !== state.actionSequence) {
+      return rejectStale(socket, state);
+    }
+
+    const room = await Room.findById(roomId);
+    if (!room || room.trackIds.length === 0) return;
+
+    // If playing for more than 3 seconds, restart the current track
+    const currentPosition = state.playbackState.isPlaying 
+      ? Date.now() - state.playbackState.startedAtServerTime 
+      : state.playbackState.pausedAtOffsetMs;
+      
+    if (currentPosition > 3000) {
+      if (state.playbackState.isPlaying) {
+        state.playbackState.startedAtServerTime = Date.now();
+      } else {
+        state.playbackState.pausedAtOffsetMs = 0;
+      }
+      state.actionSequence += 1;
+      persistState(roomId, state);
+      return broadcast(roomId, state);
+    }
+
+    const trackIds = room.trackIds.map((id) => id.toString());
+    const currentIndex = trackIds.indexOf(state.currentTrackId);
+    let prevIndex = 0;
+
+    if (state.playbackMode === 'SHUFFLE') {
+      prevIndex = Math.floor(Math.random() * trackIds.length);
+    } else {
+      prevIndex = currentIndex - 1;
+      if (prevIndex < 0) {
+        if (state.playbackMode === 'REPEAT_ALL') {
+          prevIndex = trackIds.length - 1;
+        } else {
+          prevIndex = 0;
+        }
+      }
+    }
+
+    state.currentTrackId = trackIds[prevIndex];
+    state.playbackState = { isPlaying: true, startedAtServerTime: Date.now(), pausedAtOffsetMs: 0 };
+    state.actionSequence += 1;
+
+    persistState(roomId, state);
+    broadcast(roomId, state);
   });
 }
 

@@ -232,14 +232,14 @@ Both pages: show inline field-level errors from API response; disable submit whi
 
 ### T-28: TrackList component (`client/src/components/TrackList.jsx`)
 - Render `roomStore.tracks`
-- Each row: title, artist, duration
+- Each row: title, duration
 - Highlight currently playing track
 - Click track → emit `playback:trackChange` (include current actionSequence)
 - Uploader or host sees delete button per track
 
 ### T-29: TrackUpload component (`client/src/components/TrackUpload.jsx`)
 - File input accepting `.mp3,.wav,.m4a`
-- Title + artist text fields
+- Title text field
 - Client-side size check (15 MB) before submit
 - POST multipart to `/rooms/:roomId/tracks` with progress indicator
 - On success: `roomStore.addTrack(track)`

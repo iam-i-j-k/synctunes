@@ -46,13 +46,21 @@ async function listRooms(req, res) {
     const limit = Math.min(50, Math.max(1, parseInt(req.query.limit) || 20));
     const skip = (page - 1) * limit;
 
+    const query = {
+      $or: [
+        { isPrivate: false },
+        { isPrivate: true, memberIds: req.user.userId },
+        { isPrivate: true, hostId: req.user.userId }
+      ]
+    };
+
     const [rooms, total] = await Promise.all([
-      Room.find({ isPrivate: false })
+      Room.find(query)
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
         .populate('hostId', 'username'),
-      Room.countDocuments({ isPrivate: false }),
+      Room.countDocuments(query),
     ]);
 
     return res.json({ rooms, total, page, limit });

@@ -1,7 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
+import { Play, Pause, SkipForward, SkipBack, Volume2, VolumeX, Heart, Music, Shuffle, Repeat, Maximize2, Minimize2 } from 'lucide-react';
 import socket from '../socket/socket';
 import usePlayerStore from '../stores/playerStore';
 import useRoomStore from '../stores/roomStore';
+import useAuthStore from '../stores/authStore';
+import api from '../api/axios';
 import { useDriftCorrection } from '../hooks/useDriftCorrection';
 
 function formatSec(sec) {
@@ -9,6 +12,17 @@ function formatSec(sec) {
   const m = Math.floor(sec / 60);
   const s = Math.floor(sec % 60);
   return `${m}:${s.toString().padStart(2, '0')}`;
+}
+
+// Generate a subtle deterministic gradient based on a string
+function stringToGradient(str = '') {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = str.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const h1 = Math.abs(hash % 360);
+  const h2 = Math.abs((hash * 2) % 360);
+  return `linear-gradient(135deg, hsl(${h1}, 70%, 50%), hsl(${h2}, 70%, 30%))`;
 }
 
 export default function AudioPlayer() {
@@ -20,6 +34,7 @@ export default function AudioPlayer() {
     playbackState,
     actionSequence,
     currentTrackId,
+    playbackMode,
     applyPlaybackUpdate,
     getAuthorisedPositionMs,
   } = usePlayerStore();
@@ -32,7 +47,9 @@ export default function AudioPlayer() {
   const [volume, setVolume] = useState(1);
   const [seeking, setSeeking] = useState(false);
   const [seekValue, setSeekValue] = useState(0);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
+  const { user, updateUser } = useAuthStore();
   const roomId = currentRoom?._id;
 
   useDriftCorrection(audioRef, roomId);
@@ -68,9 +85,16 @@ export default function AudioPlayer() {
 
     socket.on('playback:update', handlePlaybackUpdate);
     socket.on('room:staleAction', handleStaleAction);
+    
+    function onFullscreenChange() {
+      setIsFullscreen(!!document.fullscreenElement);
+    }
+    document.addEventListener('fullscreenchange', onFullscreenChange);
+
     return () => {
       socket.off('playback:update', handlePlaybackUpdate);
       socket.off('room:staleAction', handleStaleAction);
+      document.removeEventListener('fullscreenchange', onFullscreenChange);
     };
   }, [applyPlaybackUpdate]);
 
@@ -98,17 +122,25 @@ export default function AudioPlayer() {
       setVolume(audio.volume);
     }
 
+    function onEnded() {
+      if (!seekingRef.current) {
+        socket.emit('playback:next', { roomId, actionSequence });
+      }
+    }
+
     audio.addEventListener('timeupdate', onTimeUpdate);
     audio.addEventListener('loadedmetadata', onLoadedMetadata);
     audio.addEventListener('durationchange', onDurationChange);
     audio.addEventListener('volumechange', onVolumeChange);
+    audio.addEventListener('ended', onEnded);
     return () => {
       audio.removeEventListener('timeupdate', onTimeUpdate);
       audio.removeEventListener('loadedmetadata', onLoadedMetadata);
       audio.removeEventListener('durationchange', onDurationChange);
       audio.removeEventListener('volumechange', onVolumeChange);
+      audio.removeEventListener('ended', onEnded);
     };
-  }, []);
+  }, [roomId, actionSequence]);
 
   function togglePlay() {
     if (!currentTrack) return;
@@ -157,10 +189,62 @@ export default function AudioPlayer() {
     }
   }
 
+  function toggleFullscreen() {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().catch(err => {
+        console.error(`Error attempting to enable fullscreen: ${err.message}`);
+      });
+    } else {
+      if (document.exitFullscreen) {
+        document.exitFullscreen();
+      }
+    }
+  }
+
+  async function toggleLike() {
+    if (!user || !currentTrackId) return;
+    try {
+      const isLiked = user.likedTracks?.includes(currentTrackId);
+      const newLikedTracks = isLiked 
+        ? user.likedTracks.filter(id => id !== currentTrackId)
+        : [...(user.likedTracks || []), currentTrackId];
+      
+      updateUser({ likedTracks: newLikedTracks });
+      
+      const { data } = await api.post(`/users/likes/${currentTrackId}`);
+      updateUser({ likedTracks: data.likedTracks });
+    } catch (err) {
+      console.error(err);
+    }
+  }
+
+  function toggleShuffle() {
+    const newMode = playbackMode === 'SHUFFLE' ? 'NORMAL' : 'SHUFFLE';
+    socket.emit('playback:mode', { roomId, mode: newMode, actionSequence });
+  }
+
+  function toggleRepeat() {
+    let newMode = 'NORMAL';
+    if (playbackMode === 'NORMAL') newMode = 'REPEAT_ALL';
+    else if (playbackMode === 'REPEAT_ALL') newMode = 'REPEAT_ONE';
+    else if (playbackMode === 'REPEAT_ONE') newMode = 'NORMAL';
+    if (playbackMode === 'SHUFFLE') newMode = 'REPEAT_ALL';
+    socket.emit('playback:mode', { roomId, mode: newMode, actionSequence });
+  }
+
+  function playNext() {
+    socket.emit('playback:next', { roomId, actionSequence });
+  }
+
+  function playPrev() {
+    socket.emit('playback:prev', { roomId, actionSequence });
+  }
+
   if (!currentTrack) {
     return (
-      <div className="player-panel" style={{ justifyContent: 'center' }}>
-        <div style={{ color: 'var(--color-text-muted)', fontSize: '0.9rem' }}>
+      <div className="h-[90px] w-full flex items-center justify-center p-4 bg-zinc-950/60 backdrop-blur-3xl border border-white/10 rounded-[2rem] shadow-2xl">
+        <div className="text-gray-400 text-sm font-medium flex items-center gap-3 animate-pulse">
+          <Music size={18} />
           Select a track to start listening
         </div>
       </div>
@@ -172,64 +256,98 @@ export default function AudioPlayer() {
   const volumePercentage = volume * 100;
 
   return (
-    <div className="player-panel">
+    <div className="h-[96px] w-full flex items-center justify-between px-6 bg-zinc-950/80 backdrop-blur-3xl border border-white/10 rounded-[2.5rem] shadow-[0_20px_40px_rgba(0,0,0,0.5)] transition-all">
       <audio ref={audioRef} src={currentTrack.cloudinaryUrl} preload="auto" />
 
       {/* LEFT: Art & Info */}
-      <div className="player-left">
-        <div className="player-art-small">
-          <svg role="img" height="24" width="24" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M6 3h15v15.167a3.5 3.5 0 1 1-3.5-3.5H19V5H8v13.167a3.5 3.5 0 1 1-3.5-3.5H6V3zm0 13.667H4.5a1.5 1.5 0 1 0 1.5 1.5v-1.5zm13-2H17.5a1.5 1.5 0 1 0 1.5 1.5v-1.5z"></path>
-          </svg>
+      <div className="flex-1 min-w-0 flex items-center gap-4 pr-4 justify-start">
+        <div 
+          className="w-14 h-14 rounded-2xl flex items-center justify-center text-white/80 flex-shrink-0 shadow-[0_4px_15px_rgba(0,0,0,0.5)] relative overflow-hidden group"
+          style={{ background: stringToGradient(currentTrack.title) }}
+        >
+          {playbackState.isPlaying && (
+            <div className="absolute inset-0 bg-black/20 flex items-center justify-center">
+              <div className="w-4 h-4 rounded-full bg-white/30 animate-ping"></div>
+            </div>
+          )}
+          <Music size={24} className="z-10 drop-shadow-md" />
         </div>
-        <div className="player-info-container">
-          <div className="title" title={currentTrack.title}>{currentTrack.title}</div>
-          <div className="artist" title={currentTrack.artist}>{currentTrack.artist}</div>
+        <div className="flex flex-col justify-center min-w-0 flex-1">
+          <div className="text-[15px] font-bold text-white truncate hover:underline cursor-pointer tracking-tight" title={currentTrack.title}>{currentTrack.title}</div>
         </div>
-        <button className="like-btn" aria-label="Save to Your Library">
-          <svg role="img" height="16" width="16" viewBox="0 0 16 16" fill="currentColor">
-            <path d="M1.69 2A4.582 4.582 0 0 1 8 2.023 4.583 4.583 0 0 1 11.88.817h.002a4.618 4.618 0 0 1 3.782 3.65v.003a4.543 4.543 0 0 1-1.011 3.84L9.35 14.629a1.765 1.765 0 0 1-2.093.464 1.762 1.762 0 0 1-1.15-1.464l-5.35-6.32a4.541 4.541 0 0 1-1.01-3.84 4.62 4.62 0 0 1 3.783-3.65h.002zM8 3.559a3.082 3.082 0 0 0-4.242 4.22L8 13.064l4.242-5.285A3.082 3.082 0 0 0 8 3.559z"></path>
-          </svg>
+        <button 
+          className={`transition-colors flex-shrink-0 mx-2 hover:scale-110 transform ${user?.likedTracks?.includes(currentTrackId) ? 'text-primary' : 'text-gray-400 hover:text-primary'}`}
+          onClick={toggleLike}
+          aria-label="Save to Your Library"
+        >
+          <Heart size={18} fill={user?.likedTracks?.includes(currentTrackId) ? 'currentColor' : 'none'} />
         </button>
       </div>
 
       {/* CENTER: Playback Controls & Slider */}
-      <div className="player-center">
-        <div className="playback-controls">
-          <button className="control-btn" aria-label="Previous (dummy)">
-            <svg role="img" height="16" width="16" viewBox="0 0 16 16" fill="currentColor">
-              <path d="M3.3 1a.7.7 0 0 1 .7.7v5.15l9.95-5.743a.7.7 0 0 1 1.05.606v12.575a.7.7 0 0 1-1.05.607L4 9.149V14.3a.7.7 0 0 1-.7.7H1.7a.7.7 0 0 1-.7-.7V1.7a.7.7 0 0 1 .7-.7h1.6z"></path>
-            </svg>
+      <div className="flex-[2] max-w-[700px] flex flex-col items-center justify-center px-4">
+        <div className="flex items-center gap-6 mb-2">
+          <button 
+            className={`transition-colors relative ${playbackMode === 'SHUFFLE' ? 'text-primary' : 'text-gray-500 hover:text-white'}`}
+            onClick={toggleShuffle} 
+            aria-label="Shuffle"
+          >
+            <Shuffle size={16} />
+            {playbackMode === 'SHUFFLE' && <div className="absolute -bottom-1.5 left-1/2 transform -translate-x-1/2 w-1 h-1 bg-primary rounded-full"></div>}
+          </button>
+          
+          <button 
+            className="text-gray-400 hover:text-white transition-colors hover:scale-110 transform" 
+            onClick={playPrev} 
+            aria-label="Previous"
+          >
+            <SkipBack size={20} fill="currentColor" />
           </button>
           
           <button
-            className="play-btn"
+            className="w-10 h-10 flex items-center justify-center rounded-full bg-white text-black hover:scale-105 transition-all shadow-[0_0_20px_rgba(255,255,255,0.3)] hover:shadow-[0_0_25px_rgba(255,255,255,0.5)]"
             onClick={togglePlay}
             aria-label={playbackState.isPlaying ? 'Pause' : 'Play'}
           >
             {playbackState.isPlaying ? (
-              <svg role="img" height="16" width="16" viewBox="0 0 16 16" fill="currentColor">
-                <path d="M2.7 1a.7.7 0 0 0-.7.7v12.6a.7.7 0 0 0 .7.7h2.6a.7.7 0 0 0 .7-.7V1.7a.7.7 0 0 0-.7-.7H2.7zm8 0a.7.7 0 0 0-.7.7v12.6a.7.7 0 0 0 .7.7h2.6a.7.7 0 0 0 .7-.7V1.7a.7.7 0 0 0-.7-.7h-2.6z"></path>
-              </svg>
+              <Pause size={18} fill="currentColor" />
             ) : (
-              <svg role="img" height="16" width="16" viewBox="0 0 16 16" fill="currentColor">
-                <path d="M3 1.713a.7.7 0 0 1 1.05-.607l10.89 6.288a.7.7 0 0 1 0 1.212L4.05 14.894A.7.7 0 0 1 3 14.288V1.713z"></path>
-              </svg>
+              <Play size={18} fill="currentColor" className="ml-0.5" />
             )}
           </button>
 
-          <button className="control-btn" aria-label="Next (dummy)">
-            <svg role="img" height="16" width="16" viewBox="0 0 16 16" fill="currentColor">
-              <path d="M12.7 1a.7.7 0 0 0-.7.7v5.15L2.05 1.107A.7.7 0 0 0 1 1.712v12.575a.7.7 0 0 0 1.05.607L12 9.149V14.3a.7.7 0 0 0 .7.7h1.6a.7.7 0 0 0 .7-.7V1.7a.7.7 0 0 0-.7-.7h-1.6z"></path>
-            </svg>
+          <button 
+            className="text-gray-400 hover:text-white transition-colors hover:scale-110 transform" 
+            onClick={playNext} 
+            aria-label="Next"
+          >
+            <SkipForward size={20} fill="currentColor" />
+          </button>
+          
+          <button 
+            className={`transition-colors relative ${playbackMode.startsWith('REPEAT') ? 'text-primary' : 'text-gray-500 hover:text-white'}`}
+            onClick={toggleRepeat} 
+            aria-label="Repeat"
+          >
+            <Repeat size={16} />
+            {playbackMode === 'REPEAT_ONE' && <div className="absolute -top-1 -right-1.5 text-[8px] font-bold text-primary">1</div>}
+            {playbackMode.startsWith('REPEAT') && <div className="absolute -bottom-1.5 left-1/2 transform -translate-x-1/2 w-1 h-1 bg-primary rounded-full"></div>}
           </button>
         </div>
-        <div className="player-timeline">
-          <span className="time-text">{formatSec(currentVal)}</span>
-          <div className="progress-bar-container" style={{ '--progress-pct': `${seekPercentage}%` }}>
+        <div className="w-full flex items-center gap-3 group">
+          <span className="text-[11px] font-medium text-gray-400 w-10 text-right tabular-nums">{formatSec(currentVal)}</span>
+          <div className="relative flex-1 h-4 flex items-center cursor-pointer group/slider" style={{ '--progress-pct': `${seekPercentage}%` }}>
+            <div className="absolute inset-x-0 h-1.5 bg-white/10 rounded-full overflow-hidden pointer-events-none">
+              <div className="h-full bg-white group-hover/slider:bg-primary transition-colors" style={{ width: `${seekPercentage}%` }} />
+            </div>
+            {/* Custom thumb on hover */}
+            <div 
+              className="absolute h-3 w-3 bg-white rounded-full shadow-md opacity-0 group-hover/slider:opacity-100 transition-opacity pointer-events-none -ml-1.5 z-10" 
+              style={{ left: `${seekPercentage}%` }}
+            />
             <input
               type="range"
-              className="styled-slider"
+              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
               min={0}
               max={duration || 1}
               step={0.01}
@@ -243,36 +361,42 @@ export default function AudioPlayer() {
               aria-label="Seek"
             />
           </div>
-          <span className="time-text">{formatSec(duration)}</span>
+          <span className="text-[11px] font-medium text-gray-400 w-10 tabular-nums">{formatSec(duration)}</span>
         </div>
       </div>
 
       {/* RIGHT: Volume Controls */}
-      <div className="player-right">
-        <button className="control-btn" onClick={toggleMute} aria-label={volume > 0 ? "Mute" : "Unmute"}>
-          {volume > 0 ? (
-            <svg role="img" height="16" width="16" viewBox="0 0 16 16" fill="currentColor">
-              <path d="M9.741.85a.75.75 0 0 1 .375.65v13a.75.75 0 0 1-1.125.65l-6.925-4a3.642 3.642 0 0 1-1.33-4.967 3.639 3.639 0 0 1 1.33-1.332l6.925-4a.75.75 0 0 1 .75 0zm-6.924 5.3a2.139 2.139 0 0 0 0 3.7l5.8 3.35V2.8l-5.8 3.35zm8.683 4.29V5.56a2.75 2.75 0 0 1 0 4.88z"></path>
-              <path d="M11.5 13.614a5.752 5.752 0 0 0 0-11.228v1.55a4.252 4.252 0 0 1 0 8.127v1.55z"></path>
-            </svg>
-          ) : (
-            <svg role="img" height="16" width="16" viewBox="0 0 16 16" fill="currentColor">
-              <path d="M13.86 5.47a.75.75 0 0 0-1.061 0l-1.47 1.47-1.47-1.47A.75.75 0 0 0 8.8 6.53L10.269 8l-1.47 1.47a.75.75 0 1 0 1.06 1.06l1.47-1.47 1.47 1.47a.75.75 0 0 0 1.06-1.06L12.39 8l1.47-1.47a.75.75 0 0 0 0-1.06z"></path>
-              <path d="M10.116 1.5A.75.75 0 0 0 8.991.85l-6.925 4a3.642 3.642 0 0 0-1.33 4.967 3.639 3.639 0 0 0 1.33 1.332l6.925 4a.75.75 0 0 0 1.125-.65v-13zM2.817 6.15a2.139 2.139 0 0 1 0-3.7l5.8-3.35v13.7l-5.8-3.35z"></path>
-            </svg>
-          )}
+      <div className="flex-1 hidden md:flex justify-end items-center gap-4 min-w-[200px]">
+        <button className="text-gray-400 hover:text-white transition-colors" onClick={toggleFullscreen} aria-label="Toggle Fullscreen">
+          {isFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
         </button>
-        <div className="progress-bar-container volume-bar" style={{ '--progress-pct': `${volumePercentage}%` }}>
-          <input
-            type="range"
-            className="styled-slider"
-            min={0}
-            max={1}
-            step={0.01}
-            value={volume}
-            onChange={handleVolumeChange}
-            aria-label="Volume"
-          />
+        <div className="flex items-center gap-2">
+          <button className="text-gray-400 hover:text-white transition-colors" onClick={toggleMute} aria-label={volume > 0 ? "Mute" : "Unmute"}>
+            {volume > 0 ? (
+              <Volume2 size={18} />
+            ) : (
+              <VolumeX size={18} />
+            )}
+          </button>
+          <div className="relative w-[100px] h-4 flex items-center group/vol">
+            <div className="absolute inset-x-0 h-1.5 bg-white/10 rounded-full overflow-hidden pointer-events-none">
+              <div className="h-full bg-white group-hover/vol:bg-primary transition-colors" style={{ width: `${volumePercentage}%` }} />
+            </div>
+            <div 
+              className="absolute h-3 w-3 bg-white rounded-full shadow-md opacity-0 group-hover/vol:opacity-100 transition-opacity pointer-events-none -ml-1.5 z-10" 
+              style={{ left: `${volumePercentage}%` }}
+            />
+            <input
+              type="range"
+              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+              min={0}
+              max={1}
+              step={0.01}
+              value={volume}
+              onChange={handleVolumeChange}
+              aria-label="Volume"
+            />
+          </div>
         </div>
       </div>
     </div>

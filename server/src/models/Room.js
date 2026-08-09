@@ -40,10 +40,21 @@ const roomSchema = new mongoose.Schema(
         ref: 'User',
       },
     ],
+    trackIds: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Track',
+      },
+    ],
     currentTrackId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Track',
       default: null,
+    },
+    playbackMode: {
+      type: String,
+      enum: ['NORMAL', 'REPEAT_ALL', 'REPEAT_ONE', 'SHUFFLE'],
+      default: 'NORMAL',
     },
     playbackState: {
       type: playbackStateSchema,

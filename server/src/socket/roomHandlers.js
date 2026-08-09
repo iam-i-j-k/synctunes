@@ -69,6 +69,7 @@ function registerRoomHandlers(io, socket, roomCache) {
           currentTrackId: state.currentTrackId,
           playbackState: state.playbackState,
           actionSequence: state.actionSequence,
+          playbackMode: state.playbackMode,
         },
         members,
         actionSequence: state.actionSequence,
@@ -114,11 +115,6 @@ async function handleLeave(io, socket, roomId, userId) {
     ).populate('memberIds', 'username');
 
     if (!room) return;
-
-    // If the host left and others remain, transfer host atomically
-    if (room.hostId.toString() === userId && room.memberIds.length > 0) {
-      await Room.findByIdAndUpdate(roomId, { hostId: room.memberIds[0]._id });
-    }
 
     const members = room.memberIds.map((m) => ({
       userId: m._id.toString(),

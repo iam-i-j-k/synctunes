@@ -152,7 +152,6 @@ synctunes/
   _id:                ObjectId,
   roomId:             ObjectId, // ref: Room
   title:              String,
-  artist:             String,
   cloudinaryUrl:      String,   // secure_url from Cloudinary
   cloudinaryPublicId: String,   // public_id from Cloudinary (for destroy)
   durationMs:         Number,

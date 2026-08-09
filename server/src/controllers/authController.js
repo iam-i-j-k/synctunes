@@ -1,6 +1,9 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const { OAuth2Client } = require('google-auth-library');
 const User = require('../models/User');
+
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 function signToken(user) {
   return jwt.sign(
@@ -35,7 +38,7 @@ async function register(req, res) {
     const token = signToken(user);
     return res.status(201).json({
       token,
-      user: { id: user._id, username: user.username, email: user.email },
+      user: { id: user._id, username: user.username, email: user.email, likedTracks: user.likedTracks || [] },
     });
   } catch (err) {
     console.error('register error:', err);
@@ -59,7 +62,7 @@ async function login(req, res) {
     const token = signToken(user);
     return res.json({
       token,
-      user: { id: user._id, username: user.username, email: user.email },
+      user: { id: user._id, username: user.username, email: user.email, likedTracks: user.likedTracks || [] },
     });
   } catch (err) {
     console.error('login error:', err);
@@ -67,4 +70,69 @@ async function login(req, res) {
   }
 }
 
-module.exports = { register, login };
+async function googleLogin(req, res) {
+  try {
+    const { credential } = req.body;
+    if (!credential) {
+      return res.status(400).json({ message: 'Google credential is required' });
+    }
+
+    let payload;
+    try {
+      const ticket = await googleClient.verifyIdToken({
+        idToken: credential,
+        audience: process.env.GOOGLE_CLIENT_ID,
+      });
+      payload = ticket.getPayload();
+    } catch (err) {
+      console.error('Google token verification failed:', err);
+      return res.status(401).json({ message: 'Invalid Google token' });
+    }
+
+    const { sub: googleId, email, name, picture } = payload;
+    const lowerEmail = email.toLowerCase();
+
+    // Find existing user by googleId or email
+    let user = await User.findOne({
+      $or: [{ googleId }, { email: lowerEmail }],
+    });
+
+    if (!user) {
+      // Create new user
+      // Generate a base username from email or name
+      let baseUsername = name ? name.replace(/\s+/g, '').toLowerCase() : lowerEmail.split('@')[0];
+      // Ensure it's unique
+      let username = baseUsername;
+      let counter = 1;
+      while (await User.findOne({ username })) {
+        username = `${baseUsername}${counter}`;
+        counter++;
+      }
+
+      user = await User.create({
+        username,
+        email: lowerEmail,
+        googleId,
+        avatarUrl: picture,
+      });
+    } else {
+      // If user exists but doesn't have googleId linked (they signed up with email before)
+      if (!user.googleId) {
+        user.googleId = googleId;
+        user.avatarUrl = user.avatarUrl || picture;
+        await user.save();
+      }
+    }
+
+    const token = signToken(user);
+    return res.json({
+      token,
+      user: { id: user._id, username: user.username, email: user.email, avatarUrl: user.avatarUrl, likedTracks: user.likedTracks || [] },
+    });
+  } catch (err) {
+    console.error('googleLogin error:', err);
+    return res.status(500).json({ message: 'Server error' });
+  }
+}
+
+module.exports = { register, login, googleLogin };
