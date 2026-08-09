@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Plus, UploadCloud, X, Music, Check } from 'lucide-react';
 import api from '../api/axios';
 import useRoomStore from '../stores/roomStore';
@@ -161,7 +162,7 @@ export default function TrackUpload() {
         <span className="group-hover:text-primary transition-colors">Add Track</span>
       </button>
 
-      {isModalOpen && (
+      {isModalOpen && createPortal(
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-md p-4" onClick={!isUploading ? closeModal : undefined}>
           <div 
             className="w-full max-w-2xl bg-zinc-900 border border-white/10 rounded-2xl p-6 flex flex-col max-h-[90vh] shadow-2xl" 
@@ -295,7 +296,8 @@ export default function TrackUpload() {
 
             {globalError && <div className="text-red-500 text-center mt-4 text-sm font-medium flex-shrink-0">{globalError}</div>}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

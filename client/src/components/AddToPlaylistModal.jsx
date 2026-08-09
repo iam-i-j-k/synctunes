@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { X, ListMusic, Plus } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { X, ListMusic, Plus, Check } from 'lucide-react';
 import api from '../api/axios';
 
 export default function AddToPlaylistModal({ track, onClose }) {
@@ -7,6 +8,7 @@ export default function AddToPlaylistModal({ track, onClose }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [addedPlaylists, setAddedPlaylists] = useState(new Set());
+  const [success, setSuccess] = useState(false);
   
   // Create playlist inline
   const [showCreate, setShowCreate] = useState(false);
@@ -31,7 +33,11 @@ export default function AddToPlaylistModal({ track, onClose }) {
     try {
       await api.post(`/playlists/${playlistId}/tracks`, { trackId: track._id });
       setAddedPlaylists(new Set([...addedPlaylists, playlistId]));
-      setTimeout(() => onClose(), 1000);
+      setSuccess(true);
+      setTimeout(() => {
+        setSuccess(false);
+        onClose();
+      }, 1500);
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to add to playlist');
     }
@@ -53,10 +59,9 @@ export default function AddToPlaylistModal({ track, onClose }) {
       setCreating(false);
     }
   }
-
-  return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="w-full max-w-md bg-zinc-900 border border-white/10 rounded-2xl p-6 shadow-2xl flex flex-col max-h-[80vh]">
+  return createPortal(
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="w-full max-w-md bg-zinc-900 border border-white/10 rounded-2xl p-6 shadow-2xl flex flex-col max-h-[80vh] relative">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xl font-bold text-white flex items-center gap-2">
             <ListMusic size={20} className="text-primary" /> Add to Playlist
@@ -127,7 +132,18 @@ export default function AddToPlaylistModal({ track, onClose }) {
             <Plus size={18} /> New Playlist
           </button>
         )}
+
+        {/* Success Animation Overlay */}
+        {success && (
+          <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-zinc-900/90 backdrop-blur-sm rounded-2xl animate-fade-in">
+            <div className="w-16 h-16 bg-primary rounded-full flex items-center justify-center mb-4 shadow-[0_0_30px_rgba(30,215,96,0.5)]">
+              <Check size={32} className="text-black" />
+            </div>
+            <h3 className="text-xl font-bold text-white">Added to Playlist</h3>
+          </div>
+        )}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

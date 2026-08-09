@@ -63,13 +63,14 @@ export default function AudioPlayer() {
     const positionSec = positionMs / 1000;
 
     if (playbackState.isPlaying) {
-      if (Math.abs(audio.currentTime - positionSec) > 0.3) {
+      // Only seek if metadata is loaded (readyState > 0). Setting currentTime before that causes flickering.
+      if (audio.readyState > 0 && Math.abs(audio.currentTime - positionSec) > 0.3) {
         audio.currentTime = positionSec;
       }
       audio.play().catch(() => {});
     } else {
       audio.pause();
-      if (Math.abs(audio.currentTime - positionSec) > 0.3) {
+      if (audio.readyState > 0 && Math.abs(audio.currentTime - positionSec) > 0.3) {
         audio.currentTime = positionSec;
       }
     }
@@ -111,6 +112,12 @@ export default function AudioPlayer() {
       if (audio.duration && audio.duration !== Infinity && !isNaN(audio.duration)) {
         setDuration(audio.duration);
       }
+      // Apply initial drift correction as soon as metadata loads to prevent start-flicker
+      const positionMs = usePlayerStore.getState().getAuthorisedPositionMs();
+      const positionSec = positionMs / 1000;
+      if (Math.abs(audio.currentTime - positionSec) > 0.3) {
+        audio.currentTime = positionSec;
+      }
     }
 
     function onDurationChange() {
@@ -151,6 +158,23 @@ export default function AudioPlayer() {
       socket.emit('playback:play', { roomId, actionSequence });
     }
   }
+
+  useEffect(() => {
+    function handleKeyDown(e) {
+      if (e.code === 'Space') {
+        const tag = e.target.tagName.toLowerCase();
+        // Don't intercept if user is typing in an input or textarea
+        if (tag === 'input' || tag === 'textarea' || e.target.isContentEditable) {
+          return;
+        }
+        e.preventDefault(); // Prevent page scroll
+        togglePlay();
+      }
+    }
+    
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [currentTrack, playbackState.isPlaying, roomId, actionSequence]);
 
   function handleSeekStart(e) {
     seekingRef.current = true;
