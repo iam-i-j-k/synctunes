@@ -3,7 +3,8 @@ import socket from '../socket/socket';
 import usePlayerStore from '../stores/playerStore';
 
 const HEARTBEAT_INTERVAL_MS = 5_000; // every 5s
-const DRIFT_THRESHOLD_MS = 300;      // correct if drift > 300ms
+const MAX_DRIFT_MS = 2000; // Hard jump if off by > 2s
+const MIN_DRIFT_MS = 150;  // Ignore tiny drifts < 150ms
 
 export function useDriftCorrection(audioRef, roomId) {
   const { playbackState, applyPlaybackUpdate, getAuthorisedPositionMs } = usePlayerStore();
@@ -24,10 +25,22 @@ export function useDriftCorrection(audioRef, roomId) {
 
       const authoritativeMs = getAuthorisedPositionMs();
       const localMs = audioRef.current.currentTime * 1000;
-      const drift = Math.abs(localMs - authoritativeMs);
+      const drift = authoritativeMs - localMs;
+      const absDrift = Math.abs(drift);
 
-      if (drift > DRIFT_THRESHOLD_MS) {
+      if (absDrift > MAX_DRIFT_MS) {
+        // Massive desync -> Hard jump to prevent playing the wrong section
         audioRef.current.currentTime = authoritativeMs / 1000;
+        audioRef.current.playbackRate = 1.0;
+      } else if (absDrift > MIN_DRIFT_MS) {
+        // Minor desync -> Imperceptibly speed up or slow down to catch up smoothly
+        // We adjust speed to close the gap over the next 5 seconds (heartbeat interval)
+        // Max adjustment will be ~1.4x or 0.6x which is only for edge cases near 2s.
+        const speedModifier = drift / HEARTBEAT_INTERVAL_MS;
+        audioRef.current.playbackRate = 1.0 + Math.max(-0.2, Math.min(0.2, speedModifier));
+      } else {
+        // Perfectly in sync
+        audioRef.current.playbackRate = 1.0;
       }
 
       // Ensure play/pause matches server state
