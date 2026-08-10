@@ -115,8 +115,12 @@ export default function TrackList() {
                           <GripVertical size={16} />
                         </div>
                         <div className="flex items-center gap-3 md:gap-4 flex-1 min-w-0">
-                          <div className={`w-8 h-8 flex items-center justify-center rounded ${isPlaying ? 'text-primary' : 'text-gray-500'}`}>
-                            <Music size={18} />
+                          <div className={`w-10 h-10 flex items-center justify-center rounded overflow-hidden flex-shrink-0 bg-zinc-800 ${isPlaying ? 'text-primary' : 'text-gray-500'}`}>
+                            {track.albumArtUrl ? (
+                              <img src={track.albumArtUrl} alt="" className="w-full h-full object-cover" />
+                            ) : (
+                              <Music size={18} />
+                            )}
                           </div>
                           <div className="flex flex-col min-w-0 flex-1">
                             <span className={`font-medium text-[15px] truncate ${isPlaying ? 'text-primary' : 'text-white'}`}>

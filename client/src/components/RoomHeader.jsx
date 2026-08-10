@@ -23,7 +23,7 @@ function stringToGradient(str = '') {
 export default function RoomHeader() {
   const navigate = useNavigate();
   const { user } = useAuthStore();
-  const { currentRoom, setRoom } = useRoomStore();
+  const { currentRoom, setRoom, tracks } = useRoomStore();
 
   const [renaming, setRenaming] = useState(false);
   const [newName, setNewName] = useState('');
@@ -76,18 +76,40 @@ export default function RoomHeader() {
 
   const colors = stringToGradient(currentRoom._id);
 
+  const tracksWithArt = tracks?.filter(t => t.albumArtUrl) || [];
+  const covers = tracksWithArt.slice(0, 4).map(t => t.albumArtUrl);
+
+  let coverContent;
+  if (covers.length >= 4) {
+    coverContent = (
+      <div className="w-full h-full grid grid-cols-2 grid-rows-2">
+        {covers.map((url, i) => (
+          <div key={i} className="w-full h-full bg-cover bg-center" style={{ backgroundImage: `url(${url})` }} />
+        ))}
+      </div>
+    );
+  } else if (covers.length > 0) {
+    coverContent = (
+      <div className="w-full h-full bg-cover bg-center" style={{ backgroundImage: `url(${covers[0]})` }} />
+    );
+  } else {
+    coverContent = (
+      <span className="text-5xl md:text-7xl font-extrabold text-white/90 drop-shadow-md">
+        {currentRoom.name.substring(0, 2).toUpperCase()}
+      </span>
+    );
+  }
+
   return (
     <div 
       className="flex flex-col md:flex-row items-center md:items-end gap-6 p-6 md:p-8 border-b border-white/5 relative z-10 transition-colors duration-700"
       style={{ background: colors.headerBg }}
     >
       <div 
-        className="w-32 h-32 md:w-48 md:h-48 rounded-xl shadow-2xl flex items-center justify-center flex-shrink-0"
-        style={{ background: colors.iconBg }}
+        className="w-32 h-32 md:w-48 md:h-48 rounded-xl shadow-2xl flex items-center justify-center flex-shrink-0 overflow-hidden"
+        style={covers.length === 0 ? { background: colors.iconBg } : { backgroundColor: '#27272a' }}
       >
-         <span className="text-5xl md:text-7xl font-extrabold text-white/90 drop-shadow-md">
-           {currentRoom.name.substring(0, 2).toUpperCase()}
-         </span>
+         {coverContent}
       </div>
       
       <div className="flex flex-col items-center md:items-start gap-2 flex-1 w-full text-center md:text-left">
