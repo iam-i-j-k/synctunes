@@ -7,6 +7,19 @@ import useAuthStore from '../stores/authStore';
 import useRoomStore from '../stores/roomStore';
 import { toast } from 'react-hot-toast';
 
+function stringToGradient(str = '') {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = str.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const h1 = Math.abs(hash % 360);
+  const h2 = Math.abs((hash * 2) % 360);
+  return {
+    iconBg: `linear-gradient(135deg, hsl(${h1}, 70%, 50%), hsl(${h2}, 70%, 30%))`,
+    headerBg: `linear-gradient(to bottom, hsl(${h1}, 50%, 15%), #09090b)`
+  };
+}
+
 export default function RoomHeader() {
   const navigate = useNavigate();
   const { user } = useAuthStore();
@@ -61,9 +74,17 @@ export default function RoomHeader() {
     });
   }
 
+  const colors = stringToGradient(currentRoom._id);
+
   return (
-    <div className="flex flex-col md:flex-row items-center md:items-end gap-6 p-6 md:p-8 bg-gradient-to-b from-indigo-900/40 to-zinc-950 border-b border-white/5 relative z-10">
-      <div className="w-32 h-32 md:w-48 md:h-48 rounded-xl shadow-2xl flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-indigo-500 to-purple-600">
+    <div 
+      className="flex flex-col md:flex-row items-center md:items-end gap-6 p-6 md:p-8 border-b border-white/5 relative z-10 transition-colors duration-700"
+      style={{ background: colors.headerBg }}
+    >
+      <div 
+        className="w-32 h-32 md:w-48 md:h-48 rounded-xl shadow-2xl flex items-center justify-center flex-shrink-0"
+        style={{ background: colors.iconBg }}
+      >
          <span className="text-5xl md:text-7xl font-extrabold text-white/90 drop-shadow-md">
            {currentRoom.name.substring(0, 2).toUpperCase()}
          </span>
