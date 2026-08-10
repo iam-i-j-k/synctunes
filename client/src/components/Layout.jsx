@@ -16,14 +16,14 @@ export default function Layout() {
         <Sidebar />
         <div className="flex-1 flex flex-col min-w-0 bg-gradient-to-b from-green-500/10 to-zinc-950 md:rounded-tl-lg overflow-hidden animate-main-gradient bg-[length:100%_400%]">
           <Header />
-          <main className={`flex-1 overflow-y-auto relative z-0 ${currentRoom ? 'pb-44 md:pb-32' : 'pb-20 md:pb-0'}`}>
+          <main className={`flex-1 flex flex-col overflow-hidden relative z-0 ${currentRoom ? 'pb-[80px] md:pb-[90px]' : 'pb-[80px] md:pb-0'}`}>
             <Outlet />
           </main>
         </div>
       </div>
       {currentRoom && (
-        <div className="fixed bottom-[80px] md:bottom-6 left-0 right-0 z-50 flex justify-center px-4 pointer-events-none transition-all">
-          <div className="pointer-events-auto w-full max-w-5xl">
+        <div className="fixed bottom-[64px] md:bottom-0 left-0 right-0 z-50 w-full px-2 md:px-0 pb-2 md:pb-0 pointer-events-none md:pointer-events-auto">
+          <div className="w-full pointer-events-auto">
             <AudioPlayer />
           </div>
         </div>

@@ -303,7 +303,7 @@ export default function AudioPlayer() {
 
       {/* COMPACT / DESKTOP PLAYER */}
       <div 
-        className={`h-[64px] md:h-[96px] w-full flex items-center justify-between px-3 md:px-6 bg-zinc-950/90 md:bg-zinc-950/80 backdrop-blur-3xl border border-white/10 rounded-xl md:rounded-[2.5rem] shadow-[0_10px_30px_rgba(0,0,0,0.5)] md:shadow-[0_20px_40px_rgba(0,0,0,0.5)] transition-all ${isMobileExpanded ? 'hidden md:flex' : 'flex'}`}
+        className={`h-[64px] md:h-[90px] w-full flex items-center justify-between px-3 md:px-4 bg-zinc-950/90 md:bg-black border border-white/10 md:border-t md:border-white/10 md:border-b-0 md:border-x-0 rounded-xl md:rounded-none shadow-[0_10px_30px_rgba(0,0,0,0.5)] md:shadow-none transition-all ${isMobileExpanded ? 'hidden md:flex' : 'flex'}`}
         onClick={(e) => {
           // Ignore clicks on buttons/inputs
           if (e.target.tagName.toLowerCase() === 'button' || e.target.closest('button') || e.target.tagName.toLowerCase() === 'input') {

@@ -71,7 +71,7 @@ export default function RoomPage() {
 
   return (
     <div className="flex flex-col xl:flex-row h-full">
-      <main className="flex-1 flex flex-col min-w-0">
+      <main className="flex-1 flex flex-col min-w-0 overflow-y-auto overflow-x-hidden">
         <RoomHeader />
 
         {roomError ? (
@@ -84,14 +84,10 @@ export default function RoomPage() {
             <p className="text-gray-400 animate-pulse font-medium">Entering Room...</p>
           </div>
         ) : (
-          <>
-            <div className="px-6 pt-6">
-              <TrackUpload />
-            </div>
-            <div className="flex-1 overflow-y-auto px-6 pb-6">
-              <TrackList />
-            </div>
-          </>
+          <div className="flex flex-col flex-1 px-4 md:px-8 py-6">
+            <TrackUpload />
+            <TrackList />
+          </div>
         )}
       </main>
 
