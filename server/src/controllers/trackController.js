@@ -93,6 +93,26 @@ async function uploadTrack(req, res) {
         }
       }
 
+      if (!albumArtUrl && title) {
+        try {
+          const searchQuery = encodeURIComponent(`${title} ${artist}`.trim());
+          const itunesUrl = `https://itunes.apple.com/search?term=${searchQuery}&entity=song&limit=1`;
+          
+          // Use dynamic import for node-fetch or native fetch if available
+          const fetchObj = typeof fetch !== 'undefined' ? fetch : (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
+          const response = await fetchObj(itunesUrl);
+          
+          if (response.ok) {
+            const data = await response.json();
+            if (data.results && data.results.length > 0 && data.results[0].artworkUrl100) {
+              albumArtUrl = data.results[0].artworkUrl100.replace('100x100bb', '600x600bb');
+            }
+          }
+        } catch (err) {
+          console.warn('iTunes API fetch failed:', err.message);
+        }
+      }
+
       if (!title) {
         return res.status(400).json({ message: 'title is required for every upload' });
       }
