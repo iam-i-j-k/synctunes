@@ -62,70 +62,90 @@ export default function RoomHeader() {
   }
 
   return (
-    <div className="flex flex-wrap items-center justify-between p-6 bg-zinc-950/80 backdrop-blur-xl border-b border-white/5 sticky top-0 z-10 gap-4">
-      <div className="flex flex-wrap items-center gap-3">
+    <div className="flex flex-col md:flex-row items-center md:items-end gap-6 p-6 md:p-8 bg-gradient-to-b from-indigo-900/40 to-zinc-950 border-b border-white/5 relative z-10">
+      <div className="w-32 h-32 md:w-48 md:h-48 rounded-xl shadow-2xl flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-indigo-500 to-purple-600">
+         <span className="text-5xl md:text-7xl font-extrabold text-white/90 drop-shadow-md">
+           {currentRoom.name.substring(0, 2).toUpperCase()}
+         </span>
+      </div>
+      
+      <div className="flex flex-col items-center md:items-start gap-2 flex-1 w-full text-center md:text-left">
+        <span className="text-xs font-bold uppercase tracking-widest text-white/80">Room Session</span>
+        
         {renaming ? (
-          <form onSubmit={handleRename} className="flex flex-wrap items-center gap-3">
+          <form onSubmit={handleRename} className="flex flex-wrap items-center gap-3 justify-center md:justify-start">
             <input
               value={newName}
               onChange={(e) => { setNewName(e.target.value); setRenameError(''); }}
-              className="min-w-[180px] px-3 py-1.5 bg-black/20 border border-white/10 rounded-lg text-white focus:outline-none focus:border-primary/50"
+              className="px-4 py-2 bg-black/20 border border-white/20 rounded-lg text-white font-bold text-xl md:text-3xl focus:outline-none focus:border-primary/50"
               autoFocus
             />
-            <button type="submit" className="px-3 py-1.5 bg-gradient-to-br from-primary to-green-600 hover:from-primary-hover hover:to-green-500 text-white font-semibold rounded-lg text-sm transition-all shadow-lg shadow-primary/20">
+            <button type="submit" className="px-4 py-2 bg-primary text-black font-bold rounded-lg text-sm transition-all hover:scale-105">
               Save
             </button>
-            <button type="button" className="px-3 py-1.5 bg-white/5 hover:bg-white/10 text-white font-semibold rounded-lg text-sm transition-all" onClick={() => setRenaming(false)}>
+            <button type="button" className="px-4 py-2 bg-white/10 text-white font-bold rounded-lg text-sm transition-all hover:bg-white/20" onClick={() => setRenaming(false)}>
               Cancel
             </button>
-            {renameError && <span className="text-red-500 text-sm">{renameError}</span>}
+            {renameError && <span className="text-red-500 text-sm font-medium w-full mt-2">{renameError}</span>}
           </form>
         ) : (
-          <>
-            <h2 className="text-xl font-bold">{currentRoom.name}</h2>
+          <div className="flex items-center gap-2 group">
+            <h1 className="text-4xl md:text-7xl font-extrabold text-white tracking-tighter truncate max-w-[250px] md:max-w-[600px]">{currentRoom.name}</h1>
             {isHost && (
               <button
-                className="p-1.5 text-gray-400 hover:text-white bg-white/0 hover:bg-white/10 rounded-md transition-colors"
+                className="p-2 text-white/30 hover:text-white transition-colors opacity-100 md:opacity-0 md:group-hover:opacity-100"
                 onClick={() => { setNewName(currentRoom.name); setRenaming(true); }}
                 title="Rename room"
               >
-                <Edit2 size={16} />
+                <Edit2 size={24} />
               </button>
             )}
-          </>
+          </div>
         )}
 
-        <button
-          className="flex items-center gap-1.5 px-2.5 py-1.5 font-mono text-sm bg-white/5 hover:bg-white/10 rounded-md transition-colors border border-white/5"
-          onClick={copyCode}
-          title="Copy join code"
-        >
-          {copied ? <Check size={16} className="text-primary" /> : <Copy size={16} className="text-gray-400" />}
-          {copied ? <span className="text-primary">Copied</span> : <span className="text-gray-300">{currentRoom.joinCode}</span>}
-        </button>
+        <div className="flex items-center gap-4 mt-2">
+          <div className="flex items-center text-sm font-medium text-gray-300">
+             Host: {isHost ? 'You' : 'Member'}
+          </div>
+          <span className="text-white/20">•</span>
+          <button
+            className="flex items-center gap-2 px-3 py-1.5 bg-white/10 hover:bg-white/20 rounded-full text-xs font-bold text-white transition-colors"
+            onClick={copyCode}
+            title="Copy join code"
+          >
+            {copied ? <Check size={14} className="text-primary" /> : <Copy size={14} />}
+            {copied ? 'COPIED!' : `ID: ${currentRoom.joinCode}`}
+          </button>
+        </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2.5">
+      <div className="flex items-center gap-2 w-full md:w-auto justify-center md:justify-end mt-4 md:mt-0">
         {isHost && !confirmDelete && (
-          <button className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-lg text-sm font-semibold transition-colors border border-red-500/20" onClick={() => setConfirmDelete(true)}>
-            <Trash2 size={16} /> Delete Room
+          <button 
+            className="p-3 text-white/50 hover:text-red-500 hover:bg-white/5 rounded-full transition-colors" 
+            onClick={() => setConfirmDelete(true)}
+            title="Delete Room"
+          >
+            <Trash2 size={22} />
           </button>
         )}
         {confirmDelete && (
-          <>
-            <span className="text-sm text-gray-400">
-              Delete this room?
-            </span>
-            <button className="px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white rounded-lg text-sm font-semibold transition-colors" onClick={handleDelete}>
-              Confirm
+          <div className="flex items-center gap-2 bg-black/40 rounded-full py-1 px-2 border border-red-500/30">
+            <span className="text-sm text-gray-300 px-2 font-medium">Delete?</span>
+            <button className="px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white rounded-full text-xs font-bold transition-colors" onClick={handleDelete}>
+              Yes
             </button>
-            <button className="px-3 py-1.5 bg-white/5 hover:bg-white/10 text-white rounded-lg text-sm font-semibold transition-colors" onClick={() => setConfirmDelete(false)}>
-              Cancel
+            <button className="px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white rounded-full text-xs font-bold transition-colors" onClick={() => setConfirmDelete(false)}>
+              No
             </button>
-          </>
+          </div>
         )}
-        <button className="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-white/10 text-white rounded-lg text-sm font-semibold transition-colors" onClick={handleLeave}>
-          <LogOut size={16} /> Leave
+        <button 
+          className="p-3 text-white/50 hover:text-white hover:bg-white/5 rounded-full transition-colors" 
+          onClick={handleLeave}
+          title="Leave Room"
+        >
+          <LogOut size={22} />
         </button>
       </div>
     </div>

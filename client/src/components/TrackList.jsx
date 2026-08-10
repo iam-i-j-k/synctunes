@@ -109,18 +109,20 @@ export default function TrackList() {
                         {...provided.draggableProps}
                         onClick={() => handleSelect(track._id)}
                         onContextMenu={(e) => handleContextMenu(e, track)}
-                        className={`flex items-center gap-4 p-4 rounded-xl cursor-pointer transition-all border ${isPlaying ? 'bg-primary/10 border-primary/30 shadow-[0_0_15px_rgba(30,215,96,0.1)]' : 'bg-white/5 border-white/5 hover:bg-white/10'}`}
+                        className={`flex items-center gap-2 md:gap-4 p-2 md:p-3 rounded-lg cursor-pointer transition-colors group w-full ${isPlaying ? 'bg-white/5' : 'hover:bg-white/5'}`}
                       >
-                        <div {...provided.dragHandleProps} className="text-gray-600 hover:text-white cursor-grab active:cursor-grabbing">
+                        <div {...provided.dragHandleProps} className="text-gray-600 hover:text-white cursor-grab active:cursor-grabbing w-6 flex justify-center opacity-50 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                           <GripVertical size={16} />
                         </div>
-                        <div className="flex items-center gap-4 flex-1 min-w-0">
-                          <Music size={18} className={isPlaying ? 'text-primary' : 'text-gray-500'} />
-                          <div className="flex flex-col min-w-0">
-                            <span className={`font-semibold text-[15px] truncate ${isPlaying ? 'text-primary' : 'text-white'}`}>
+                        <div className="flex items-center gap-3 md:gap-4 flex-1 min-w-0">
+                          <div className={`w-8 h-8 flex items-center justify-center rounded ${isPlaying ? 'text-primary' : 'text-gray-500'}`}>
+                            <Music size={18} />
+                          </div>
+                          <div className="flex flex-col min-w-0 flex-1">
+                            <span className={`font-medium text-[15px] truncate ${isPlaying ? 'text-primary' : 'text-white'}`}>
                               {track.title}
                             </span>
-                            {track.artist && <span className="text-[11px] text-gray-400 truncate">{track.artist}</span>}
+                            {track.artist && <span className="text-[12px] text-gray-400 truncate">{track.artist}</span>}
                           </div>
                         </div>
 
@@ -128,7 +130,7 @@ export default function TrackList() {
 
                         <button
                           type="button"
-                          className="p-2 text-gray-500 hover:text-white hover:bg-white/10 rounded-lg transition-colors ml-4"
+                          className="p-2 text-gray-500 hover:text-white hover:bg-white/10 rounded-lg transition-colors ml-2 opacity-100 md:opacity-0 md:group-hover:opacity-100"
                           onClick={(e) => {
                             e.stopPropagation();
                             setSelectedTrackForPlaylist(track);
@@ -141,7 +143,7 @@ export default function TrackList() {
                         {(track.uploadedBy === user?.id || isHost) && (
                           <button
                             type="button"
-                            className="p-2 text-gray-500 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors ml-2"
+                            className="p-2 text-gray-500 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors ml-1 opacity-100 md:opacity-0 md:group-hover:opacity-100"
                             onClick={(e) => {
                               e.stopPropagation();
                               handleDelete(track);

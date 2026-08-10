@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Play, Pause, SkipForward, SkipBack, Volume2, VolumeX, Heart, Music, Shuffle, Repeat, Maximize2, Minimize2, ChevronDown } from 'lucide-react';
+import { Play, Pause, SkipForward, SkipBack, Volume2, VolumeX, Heart, Music, Shuffle, Repeat, Maximize2, Minimize2, ChevronDown, MoreVertical, Share2, ListMusic, MonitorSpeaker } from 'lucide-react';
 import socket from '../socket/socket';
 import usePlayerStore from '../stores/playerStore';
 import useRoomStore from '../stores/roomStore';
@@ -470,111 +470,141 @@ export default function AudioPlayer() {
 
     {/* FULL-SCREEN MOBILE PLAYER */}
       {isMobileExpanded && (
-        <div className="md:hidden fixed inset-0 z-[100] bg-zinc-950 flex flex-col pt-12 pb-8 px-6 animate-fade-in pointer-events-auto">
-          {/* Top Bar */}
-          <div className="flex justify-between items-center mb-8">
-            <button onClick={() => setIsMobileExpanded(false)} className="text-white p-2 -ml-2">
-              <ChevronDown size={32} />
-            </button>
-            <span className="text-xs font-bold uppercase tracking-widest text-gray-400">Now Playing</span>
-            <div className="w-8"></div> {/* Spacer for centering */}
-          </div>
-          
-          {/* Big Art */}
-          <div className="flex-1 min-h-0 flex items-center justify-center mb-8">
-            <div 
-              className="w-full aspect-square max-h-[350px] max-w-[350px] rounded-2xl shadow-2xl flex items-center justify-center text-white/50 relative overflow-hidden group"
-              style={currentTrack.albumArtUrl ? { backgroundImage: `url(${currentTrack.albumArtUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' } : { background: stringToGradient(currentTrack.title) }}
-            >
-              {playbackState.isPlaying && (
-                <div className="absolute inset-0 bg-black/20 flex items-center justify-center">
-                  <div className="w-8 h-8 rounded-full bg-white/20 animate-ping"></div>
-                </div>
-              )}
-              {!currentTrack.albumArtUrl && <Music size={100} className="z-10 drop-shadow-xl" />}
-            </div>
-          </div>
+        <div className="md:hidden fixed inset-0 z-[100] bg-zinc-950 flex flex-col animate-fade-in pointer-events-auto font-sans">
+          {/* Full Screen Background (Canvas style) */}
+          <div 
+            className="absolute inset-0 z-0 bg-cover bg-center opacity-50"
+            style={currentTrack.albumArtUrl ? { backgroundImage: `url(${currentTrack.albumArtUrl})` } : { background: stringToGradient(currentTrack.title) }}
+          />
+          <div className="absolute inset-0 z-0 bg-gradient-to-t from-zinc-950 via-zinc-950/70 to-transparent pointer-events-none" />
 
-          {/* Track Info & Like */}
-          <div className="flex items-center justify-between mb-8">
-            <div className="flex flex-col min-w-0 pr-4">
-              <h2 className="text-2xl font-bold text-white truncate tracking-tight">{currentTrack.title}</h2>
-              <span className="text-gray-400 text-sm mt-1">{currentTrack.artist || 'SyncTunes Room'}</span>
-            </div>
-            <button 
-              onClick={toggleLike} 
-              className={`p-2 transition-colors transform hover:scale-110 flex-shrink-0 ${user?.likedTracks?.includes(currentTrackId) ? 'text-primary' : 'text-gray-400'}`}
-            >
-              <Heart size={28} fill={user?.likedTracks?.includes(currentTrackId) ? 'currentColor' : 'none'} />
-            </button>
-          </div>
-
-          {/* Timeline Slider */}
-          <div className="mb-8">
-            <div className="relative w-full h-10 flex items-center cursor-pointer group/slider" style={{ '--progress-pct': `${seekPercentage}%` }}>
-              <div className="absolute inset-x-0 h-2 bg-white/10 rounded-full overflow-hidden pointer-events-none">
-                <div className="h-full bg-white group-hover/slider:bg-primary transition-colors" style={{ width: `${seekPercentage}%` }} />
+          <div className="relative z-10 flex flex-col h-full pt-12 pb-8 px-6">
+            {/* Top Bar */}
+            <div className="flex justify-between items-center mb-4">
+              <button onClick={() => setIsMobileExpanded(false)} className="text-white p-2 -ml-2">
+                <ChevronDown size={28} />
+              </button>
+              <div className="flex flex-col items-center justify-center">
+                <span className="text-[10px] uppercase tracking-widest text-white/70 font-medium mb-0.5">Playing from room</span>
+                <span className="text-xs font-bold text-white">{currentRoom?.name || 'SyncTunes Room'}</span>
               </div>
-              <div 
-                className="absolute h-4 w-4 bg-white rounded-full shadow-md transition-opacity pointer-events-none -ml-2 z-10" 
-                style={{ left: `${seekPercentage}%` }}
-              />
-              <input
-                type="range"
-                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
-                style={{ touchAction: 'none' }}
-                min={0}
-                max={duration || 1}
-                step={0.01}
-                value={currentVal}
-                onMouseDown={handleSeekStart}
-                onChange={handleSeekMove}
-                onMouseUp={handleSeekEnd}
-                onTouchStart={handleSeekStart}
-                onTouchMove={handleSeekMove}
-                onTouchEnd={handleSeekEnd}
-                aria-label="Seek"
-              />
+              <button className="text-white p-2 -mr-2">
+                <MoreVertical size={24} />
+              </button>
             </div>
-            <div className="flex justify-between text-xs text-gray-400 font-medium tabular-nums mt-1 px-1">
-              <span>{formatSec(currentVal)}</span>
-              <span>{formatSec(duration)}</span>
-            </div>
-          </div>
+            
+            {/* Flexible Space (Video/Canvas area) */}
+            <div className="flex-1 min-h-0 w-full" />
 
-          {/* Big Controls */}
-          <div className="flex items-center justify-between px-2 mb-4">
-            <button 
-              onClick={toggleShuffle} 
-              className={`p-2 transition-colors relative ${playbackMode === 'SHUFFLE' ? 'text-primary' : 'text-gray-400'}`}
-            >
-              <Shuffle size={24} />
-              {playbackMode === 'SHUFFLE' && <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-1.5 h-1.5 bg-primary rounded-full"></div>}
-            </button>
-            
-            <button onClick={playPrev} className="text-white p-2">
-              <SkipBack size={36} fill="currentColor" />
-            </button>
-            
-            <button 
-              onClick={togglePlay} 
-              className="w-20 h-20 bg-white rounded-full flex items-center justify-center text-black shadow-xl transform active:scale-95 transition-transform"
-            >
-              {playbackState.isPlaying ? <Pause size={32} fill="currentColor" /> : <Play size={32} fill="currentColor" className="ml-2" />}
-            </button>
-            
-            <button onClick={playNext} className="text-white p-2">
-              <SkipForward size={36} fill="currentColor" />
-            </button>
-            
-            <button 
-              onClick={toggleRepeat} 
-              className={`p-2 transition-colors relative ${playbackMode.startsWith('REPEAT') ? 'text-primary' : 'text-gray-400'}`}
-            >
-              <Repeat size={24} />
-              {playbackMode === 'REPEAT_ONE' && <div className="absolute -top-1 -right-1 text-[10px] font-bold text-primary">1</div>}
-              {playbackMode.startsWith('REPEAT') && <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-1.5 h-1.5 bg-primary rounded-full"></div>}
-            </button>
+            {/* Bottom Controls Area */}
+            <div className="flex flex-col w-full mt-auto">
+              {/* Track Info Row */}
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center flex-1 min-w-0 pr-4">
+                  {/* Small Album Art */}
+                  <div 
+                    className="w-14 h-14 rounded bg-zinc-800 flex-shrink-0 mr-4 shadow-[0_8px_24px_rgba(0,0,0,0.5)] flex items-center justify-center overflow-hidden"
+                    style={currentTrack.albumArtUrl ? { backgroundImage: `url(${currentTrack.albumArtUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' } : { background: stringToGradient(currentTrack.title) }}
+                  >
+                    {!currentTrack.albumArtUrl && <Music size={24} className="text-white/50" />}
+                  </div>
+                  <div className="flex flex-col min-w-0 flex-1">
+                    <h2 className="text-[22px] font-bold text-white truncate tracking-tight leading-tight">{currentTrack.title}</h2>
+                    <span className="text-gray-300 text-[15px] mt-0.5 truncate">{currentTrack.artist || 'SyncTunes Room'}</span>
+                  </div>
+                </div>
+                <button 
+                  onClick={toggleLike} 
+                  className={`p-2 transition-colors transform hover:scale-110 flex-shrink-0 ${user?.likedTracks?.includes(currentTrackId) ? 'text-primary' : 'text-white'}`}
+                >
+                  <Heart size={26} fill={user?.likedTracks?.includes(currentTrackId) ? 'currentColor' : 'none'} />
+                </button>
+              </div>
+
+              {/* Timeline Slider */}
+              <div className="mb-2">
+                <div className="relative w-full h-6 flex items-center cursor-pointer group/slider" style={{ '--progress-pct': `${seekPercentage}%` }}>
+                  <div className="absolute inset-x-0 h-1 bg-white/20 rounded-full overflow-hidden pointer-events-none">
+                    <div className="h-full bg-white group-hover/slider:bg-primary transition-colors" style={{ width: `${seekPercentage}%` }} />
+                  </div>
+                  <div 
+                    className="absolute h-3 w-3 bg-white rounded-full shadow-md transition-opacity pointer-events-none -ml-1.5 z-10" 
+                    style={{ left: `${seekPercentage}%` }}
+                  />
+                  <input
+                    type="range"
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
+                    style={{ touchAction: 'none' }}
+                    min={0}
+                    max={duration || 1}
+                    step={0.01}
+                    value={currentVal}
+                    onMouseDown={handleSeekStart}
+                    onChange={handleSeekMove}
+                    onMouseUp={handleSeekEnd}
+                    onTouchStart={handleSeekStart}
+                    onTouchMove={handleSeekMove}
+                    onTouchEnd={handleSeekEnd}
+                    aria-label="Seek"
+                  />
+                </div>
+                <div className="flex justify-between text-[12px] text-gray-300 font-medium tabular-nums px-0.5 -mt-1">
+                  <span>{formatSec(currentVal)}</span>
+                  <span>{formatSec(duration)}</span>
+                </div>
+              </div>
+
+              {/* Main Controls Row */}
+              <div className="flex items-center justify-between px-1 mb-5 mt-2">
+                <button 
+                  onClick={toggleShuffle} 
+                  className={`p-2 transition-colors relative ${playbackMode === 'SHUFFLE' ? 'text-primary' : 'text-white'}`}
+                >
+                  <Shuffle size={26} />
+                  {playbackMode === 'SHUFFLE' && <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-1 h-1 bg-primary rounded-full"></div>}
+                </button>
+                
+                <button onClick={playPrev} className="text-white p-2 hover:text-gray-300 transition-colors">
+                  <SkipBack size={38} fill="currentColor" />
+                </button>
+                
+                <button 
+                  onClick={togglePlay} 
+                  className="w-[72px] h-[72px] bg-white rounded-full flex items-center justify-center text-black shadow-xl transform active:scale-95 transition-transform"
+                >
+                  {playbackState.isPlaying ? <Pause size={34} fill="currentColor" /> : <Play size={34} fill="currentColor" className="ml-1.5" />}
+                </button>
+                
+                <button onClick={playNext} className="text-white p-2 hover:text-gray-300 transition-colors">
+                  <SkipForward size={38} fill="currentColor" />
+                </button>
+                
+                <button 
+                  onClick={toggleRepeat} 
+                  className={`p-2 transition-colors relative ${playbackMode.startsWith('REPEAT') ? 'text-primary' : 'text-white'}`}
+                >
+                  <Repeat size={26} />
+                  {playbackMode === 'REPEAT_ONE' && <div className="absolute -top-1 -right-1 text-[10px] font-bold text-primary bg-black/50 rounded-full px-1">1</div>}
+                  {playbackMode.startsWith('REPEAT') && <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-1 h-1 bg-primary rounded-full"></div>}
+                </button>
+              </div>
+
+              {/* Bottom Tools Row */}
+              <div className="flex items-center justify-between px-2">
+                <button className="text-white/70 hover:text-white transition-colors p-2 -ml-2">
+                  <MonitorSpeaker size={22} />
+                </button>
+                <div className="flex items-center gap-6 mr-1">
+                  <button className="text-white/70 hover:text-white transition-colors p-2">
+                    <Share2 size={22} />
+                  </button>
+                  <button onClick={() => setIsMobileExpanded(false)} className="text-white/70 hover:text-white transition-colors p-2 -mr-2 relative" title="Queue">
+                    <ListMusic size={24} />
+                  </button>
+                </div>
+              </div>
+
+            </div>
           </div>
         </div>
       )}

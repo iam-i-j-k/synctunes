@@ -153,13 +153,13 @@ export default function TrackUpload() {
   const allSuccess = uploadItems.length > 0 && uploadItems.every(item => item.status === 'success');
 
   return (
-    <div className="px-5 pb-4">
+    <div className="px-4 py-4 md:px-6">
       <button 
-        className="w-full py-4 px-6 border-2 border-dashed border-white/20 rounded-xl bg-white/5 hover:bg-white/10 text-white font-semibold flex items-center justify-center gap-2 transition-all hover:border-primary/50 group" 
+        className="px-6 py-3 bg-white hover:bg-gray-200 text-black font-bold rounded-full flex items-center justify-center gap-2 transition-transform hover:scale-105 shadow-[0_8px_16px_rgba(255,255,255,0.1)] w-full md:w-auto" 
         onClick={() => setIsModalOpen(true)}
       >
-        <Plus size={16} className="text-gray-400 group-hover:text-primary transition-colors" />
-        <span className="group-hover:text-primary transition-colors">Add Track</span>
+        <Plus size={20} className="text-black" />
+        <span>Add to Queue</span>
       </button>
 
       {isModalOpen && createPortal(
