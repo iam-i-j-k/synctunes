@@ -7,6 +7,9 @@ import useAuthStore from '../stores/authStore';
 import api from '../api/axios';
 import { useDriftCorrection } from '../hooks/useDriftCorrection';
 import { toast } from 'react-hot-toast';
+import ContextMenu from './ContextMenu';
+import AddToPlaylistModal from './AddToPlaylistModal';
+import { downloadTrack } from '../utils/downloadTrack';
 
 function formatSec(sec) {
   if (isNaN(sec) || !isFinite(sec) || sec < 0) return '0:00';
@@ -53,6 +56,10 @@ export default function AudioPlayer() {
   const [seekValue, setSeekValue] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isMobileExpanded, setIsMobileExpanded] = useState(false);
+  const [contextMenu, setContextMenu] = useState(null);
+  const [showAddModal, setShowAddModal] = useState(false);
+
+  const displayDuration = duration || (currentTrack?.durationMs ? currentTrack.durationMs / 1000 : 0);
 
   const { user, updateUser } = useAuthStore();
   const roomId = currentRoom?._id;
@@ -287,7 +294,7 @@ export default function AudioPlayer() {
   }
 
   const currentVal = seeking ? seekValue : currentTime;
-  const seekPercentage = duration > 0 ? (currentVal / duration) * 100 : 0;
+  const seekPercentage = displayDuration > 0 ? (currentVal / displayDuration) * 100 : 0;
   const volumePercentage = volume * 100;
 
   return (
@@ -415,7 +422,7 @@ export default function AudioPlayer() {
               className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
               style={{ touchAction: 'none' }}
               min={0}
-              max={duration || 1}
+              max={displayDuration || 1}
               step={0.01}
               value={currentVal}
               onMouseDown={handleSeekStart}
@@ -427,7 +434,7 @@ export default function AudioPlayer() {
               aria-label="Seek"
             />
           </div>
-          <span className="text-[11px] font-medium text-gray-400 w-10 tabular-nums">{formatSec(duration)}</span>
+          <span className="text-[11px] font-medium text-gray-400 w-10 tabular-nums">{formatSec(displayDuration)}</span>
         </div>
       </div>
 
@@ -488,7 +495,13 @@ export default function AudioPlayer() {
                 <span className="text-[10px] uppercase tracking-widest text-white/70 font-medium mb-0.5">Playing from room</span>
                 <span className="text-xs font-bold text-white">{currentRoom?.name || 'SyncTunes Room'}</span>
               </div>
-              <button className="text-white p-2 -mr-2">
+              <button 
+                onClick={(e) => {
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  setContextMenu({ x: rect.right - 180, y: rect.bottom + 10, track: currentTrack });
+                }} 
+                className="text-white p-2 -mr-2"
+              >
                 <MoreVertical size={24} />
               </button>
             </div>
@@ -536,7 +549,7 @@ export default function AudioPlayer() {
                     className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
                     style={{ touchAction: 'none' }}
                     min={0}
-                    max={duration || 1}
+                    max={displayDuration || 1}
                     step={0.01}
                     value={currentVal}
                     onMouseDown={handleSeekStart}
@@ -550,7 +563,7 @@ export default function AudioPlayer() {
                 </div>
                 <div className="flex justify-between text-[12px] text-gray-300 font-medium tabular-nums px-0.5 -mt-1">
                   <span>{formatSec(currentVal)}</span>
-                  <span>{formatSec(duration)}</span>
+                  <span>{formatSec(displayDuration)}</span>
                 </div>
               </div>
 
@@ -591,11 +604,17 @@ export default function AudioPlayer() {
 
               {/* Bottom Tools Row */}
               <div className="flex items-center justify-between px-2">
-                <button className="text-white/70 hover:text-white transition-colors p-2 -ml-2">
+                <button 
+                  onClick={() => toast('Listening on Web Browser', { icon: '💻' })} 
+                  className="text-white/70 hover:text-white transition-colors p-2 -ml-2"
+                >
                   <MonitorSpeaker size={22} />
                 </button>
                 <div className="flex items-center gap-6 mr-1">
-                  <button className="text-white/70 hover:text-white transition-colors p-2">
+                  <button 
+                    onClick={() => { navigator.clipboard.writeText(window.location.href); toast.success('Room link copied!'); }} 
+                    className="text-white/70 hover:text-white transition-colors p-2"
+                  >
                     <Share2 size={22} />
                   </button>
                   <button onClick={() => setIsMobileExpanded(false)} className="text-white/70 hover:text-white transition-colors p-2 -mr-2 relative" title="Queue">
@@ -607,6 +626,33 @@ export default function AudioPlayer() {
             </div>
           </div>
         </div>
+      )}
+
+      {contextMenu && (
+        <ContextMenu 
+          x={contextMenu.x} 
+          y={contextMenu.y} 
+          onClose={() => setContextMenu(null)}
+          items={[
+            {
+              label: 'Add to Playlist',
+              icon: <ListMusic size={16} />,
+              onClick: () => setShowAddModal(true)
+            },
+            {
+              label: 'Download Song',
+              icon: <svg role="img" height="16" width="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>,
+              onClick: () => downloadTrack(contextMenu.track)
+            }
+          ]}
+        />
+      )}
+
+      {showAddModal && (
+        <AddToPlaylistModal 
+          track={currentTrack} 
+          onClose={() => setShowAddModal(false)} 
+        />
       )}
     </>
   );
