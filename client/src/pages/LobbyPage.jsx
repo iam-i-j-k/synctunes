@@ -159,7 +159,7 @@ export default function LobbyPage() {
           <h2 className="mb-4 text-base font-semibold text-gray-400 uppercase tracking-wider">
             My Private Rooms
           </h2>
-          <div className="grid grid-cols-[repeat(auto-fill,minmax(160px,1fr))] md:grid-cols-[repeat(auto-fill,minmax(190px,1fr))] gap-4 md:gap-5 mb-8">
+          <div className="grid grid-cols-2 sm:grid-cols-[repeat(auto-fill,minmax(160px,1fr))] md:grid-cols-[repeat(auto-fill,minmax(190px,1fr))] gap-3 md:gap-5 mb-8">
             {privateRooms.map((room) => (
               <div
                 key={room._id}
@@ -200,7 +200,7 @@ export default function LobbyPage() {
         <p className="text-gray-400">No public rooms yet. Create one!</p>
       )}
 
-      <div className="grid grid-cols-[repeat(auto-fill,minmax(160px,1fr))] md:grid-cols-[repeat(auto-fill,minmax(190px,1fr))] gap-4 md:gap-5 pb-8">
+      <div className="grid grid-cols-2 sm:grid-cols-[repeat(auto-fill,minmax(160px,1fr))] md:grid-cols-[repeat(auto-fill,minmax(190px,1fr))] gap-3 md:gap-5 pb-8">
         {publicRooms.map((room) => (
           <div
             key={room._id}

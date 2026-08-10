@@ -59,6 +59,28 @@ export default function AudioPlayer() {
   const [contextMenu, setContextMenu] = useState(null);
   const [showAddModal, setShowAddModal] = useState(false);
 
+  const titleRef = useRef(null);
+  const artistRef = useRef(null);
+  const [titleMarquee, setTitleMarquee] = useState(false);
+  const [artistMarquee, setArtistMarquee] = useState(false);
+
+  useEffect(() => {
+    if (isMobileExpanded) {
+      // Small timeout to allow the DOM to render the full text before measuring
+      setTimeout(() => {
+        if (titleRef.current) {
+          setTitleMarquee(titleRef.current.scrollWidth > titleRef.current.clientWidth);
+        }
+        if (artistRef.current) {
+          setArtistMarquee(artistRef.current.scrollWidth > artistRef.current.clientWidth);
+        }
+      }, 100);
+    } else {
+      setTitleMarquee(false);
+      setArtistMarquee(false);
+    }
+  }, [currentTrack?.title, currentTrack?.artist, isMobileExpanded]);
+
   const displayDuration = duration || (currentTrack?.durationMs ? currentTrack.durationMs / 1000 : 0);
 
   const { user, updateUser } = useAuthStore();
@@ -299,6 +321,16 @@ export default function AudioPlayer() {
 
   return (
     <>
+      <style>{`
+        @keyframes marquee {
+          0% { transform: translateX(0); }
+          100% { transform: translateX(calc(-50% - 1rem)); }
+        }
+        .mask-edges {
+          mask-image: linear-gradient(to right, transparent 0%, black 5%, black 90%, transparent 100%);
+          -webkit-mask-image: linear-gradient(to right, transparent 0%, black 5%, black 90%, transparent 100%);
+        }
+      `}</style>
       <audio ref={audioRef} src={currentTrack.cloudinaryUrl} preload="auto" />
 
       {/* COMPACT / DESKTOP PLAYER */}
@@ -521,9 +553,19 @@ export default function AudioPlayer() {
                   >
                     {!currentTrack.albumArtUrl && <Music size={24} className="text-white/50" />}
                   </div>
-                  <div className="flex flex-col min-w-0 flex-1">
-                    <h2 className="text-[22px] font-bold text-white truncate tracking-tight leading-tight">{currentTrack.title}</h2>
-                    <span className="text-gray-300 text-[15px] mt-0.5 truncate">{currentTrack.artist || 'SyncTunes Room'}</span>
+                  <div className="flex flex-col min-w-0 flex-1 overflow-hidden mask-edges relative">
+                    <div 
+                      ref={titleRef}
+                      className={`text-[22px] font-bold text-white tracking-tight leading-tight whitespace-nowrap w-fit ${titleMarquee ? 'animate-[marquee_8s_linear_infinite]' : 'truncate'}`}
+                    >
+                      {currentTrack.title} {titleMarquee && <span className="ml-8">{currentTrack.title}</span>}
+                    </div>
+                    <div 
+                      ref={artistRef}
+                      className={`text-gray-300 text-[15px] mt-0.5 whitespace-nowrap w-fit ${artistMarquee ? 'animate-[marquee_8s_linear_infinite]' : 'truncate'}`}
+                    >
+                      {currentTrack.artist || 'SyncTunes Room'} {artistMarquee && <span className="ml-8">{currentTrack.artist || 'SyncTunes Room'}</span>}
+                    </div>
                   </div>
                 </div>
                 <button 

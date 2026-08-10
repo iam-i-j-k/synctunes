@@ -110,8 +110,13 @@ async function uploadTrack(req, res) {
           
           if (response.ok) {
             const data = await response.json();
-            if (data.results && data.results.length > 0 && data.results[0].artworkUrl100) {
-              albumArtUrl = data.results[0].artworkUrl100.replace('100x100bb', '600x600bb');
+            if (data.results && data.results.length > 0) {
+              if (data.results[0].artworkUrl100) {
+                albumArtUrl = data.results[0].artworkUrl100.replace('100x100bb', '600x600bb');
+              }
+              if (!artist && data.results[0].artistName) {
+                artist = data.results[0].artistName;
+              }
             }
           }
         } catch (err) {
