@@ -182,10 +182,10 @@ function registerPlaybackHandlers(io, socket, roomCache) {
     } else {
       nextIndex = currentIndex + 1;
       if (nextIndex >= trackIds.length) {
-        if (state.playbackMode === 'REPEAT_ALL') {
-          nextIndex = 0;
-        } else {
-          // NORMAL: Stop playback if at end
+        nextIndex = 0;
+        if (state.playbackMode !== 'REPEAT_ALL') {
+          // NORMAL: Wrap back to the first track but pause playback
+          state.currentTrackId = trackIds[nextIndex];
           state.playbackState = { isPlaying: false, startedAtServerTime: 0, pausedAtOffsetMs: 0 };
           state.actionSequence += 1;
           persistState(roomId, state);
