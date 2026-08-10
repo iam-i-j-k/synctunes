@@ -4,6 +4,47 @@ import api from '../api/axios';
 import useAuthStore from '../stores/authStore';
 import { disconnectSocket } from '../socket/socket';
 
+function stringToGradient(str = '') {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = str.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const h1 = Math.abs(hash % 360);
+  const h2 = Math.abs((hash * 2) % 360);
+  return `linear-gradient(135deg, hsl(${h1}, 70%, 50%), hsl(${h2}, 70%, 30%))`;
+}
+
+function RoomCover({ room }) {
+  const tracks = room.trackIds || [];
+  const uniqueCovers = Array.from(new Set(tracks.map(t => t?.albumArtUrl).filter(Boolean)));
+  const covers = uniqueCovers.slice(0, 4);
+
+  if (covers.length >= 4) {
+    return (
+      <div className="w-full h-full grid grid-cols-2 grid-rows-2">
+        {covers.map((url, i) => (
+          <div key={i} className="w-full h-full bg-cover bg-center" style={{ backgroundImage: `url(${url})` }} />
+        ))}
+      </div>
+    );
+  } else if (covers.length > 0) {
+    return (
+      <div className="w-full h-full bg-cover bg-center" style={{ backgroundImage: `url(${covers[0]})` }} />
+    );
+  } else {
+    return (
+      <div 
+        className="w-full h-full flex items-center justify-center"
+        style={{ background: stringToGradient(room._id) }}
+      >
+        <span className="text-4xl md:text-5xl font-extrabold text-white/90 drop-shadow-md">
+          {room.name.substring(0, 2).toUpperCase()}
+        </span>
+      </div>
+    );
+  }
+}
+
 export default function LobbyPage() {
   const navigate = useNavigate();
   const { user, logout } = useAuthStore();
@@ -122,15 +163,20 @@ export default function LobbyPage() {
             {privateRooms.map((room) => (
               <div
                 key={room._id}
-                className="p-6 bg-white/[0.03] border border-white/5 rounded-2xl cursor-pointer hover:bg-white/[0.06] hover:border-white/10 hover:-translate-y-1.5 hover:scale-[1.02] transform transition-all duration-300 shadow-[0_4px_20px_rgba(0,0,0,0.2)] hover:shadow-[0_12px_24px_rgba(0,0,0,0.3),_0_0_20px_rgba(30,215,96,0.15)] group relative overflow-hidden"
+                className="p-4 md:p-6 bg-white/[0.03] border border-white/5 rounded-2xl cursor-pointer hover:bg-white/[0.06] hover:border-white/10 hover:-translate-y-1.5 hover:scale-[1.02] transform transition-all duration-300 shadow-[0_4px_20px_rgba(0,0,0,0.2)] hover:shadow-[0_12px_24px_rgba(0,0,0,0.3),_0_0_20px_rgba(30,215,96,0.15)] group relative overflow-hidden flex flex-col"
                 onClick={() => navigate(`/room/${room._id}`)}
               >
-                <div className="absolute top-0 right-0 bg-primary/20 text-primary text-[10px] font-bold px-2 py-1 rounded-bl-lg uppercase tracking-wider">Private</div>
-                <div className="font-bold text-lg mb-1.5 group-hover:text-primary transition-colors pr-10">{room.name}</div>
-                <div className="text-sm text-gray-400">
-                  Host: <span className="text-gray-300">{room.hostId?.username || 'Unknown'}</span> · {room.memberIds?.length || 0}/20 members
+                <div className="absolute top-2 right-2 bg-primary text-black text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-wider z-10 shadow-lg">Private</div>
+                
+                <div className="w-full aspect-square bg-zinc-800 rounded-xl mb-4 flex items-center justify-center overflow-hidden shadow-lg relative flex-shrink-0">
+                  <RoomCover room={room} />
                 </div>
-                <div className="mt-3 text-xs text-gray-500 font-mono bg-black/30 inline-block px-2 py-1 rounded">
+                
+                <div className="font-bold text-lg mb-1 group-hover:text-primary transition-colors truncate">{room.name}</div>
+                <div className="text-sm text-gray-400 truncate">
+                  Host: <span className="text-gray-300">{room.hostId?.username || 'Unknown'}</span>
+                </div>
+                <div className="mt-3 text-xs text-gray-500 font-mono bg-black/30 self-start px-2 py-1 rounded">
                   Code: {room.joinCode}
                 </div>
               </div>
@@ -158,14 +204,18 @@ export default function LobbyPage() {
         {publicRooms.map((room) => (
           <div
             key={room._id}
-            className="p-6 bg-white/[0.03] border border-white/5 rounded-2xl cursor-pointer hover:bg-white/[0.06] hover:border-white/10 hover:-translate-y-1.5 hover:scale-[1.02] transform transition-all duration-300 shadow-[0_4px_20px_rgba(0,0,0,0.2)] hover:shadow-[0_12px_24px_rgba(0,0,0,0.3),_0_0_20px_rgba(30,215,96,0.15)] group"
+            className="p-4 md:p-6 bg-white/[0.03] border border-white/5 rounded-2xl cursor-pointer hover:bg-white/[0.06] hover:border-white/10 hover:-translate-y-1.5 hover:scale-[1.02] transform transition-all duration-300 shadow-[0_4px_20px_rgba(0,0,0,0.2)] hover:shadow-[0_12px_24px_rgba(0,0,0,0.3),_0_0_20px_rgba(30,215,96,0.15)] group flex flex-col"
             onClick={() => navigate(`/room/${room._id}`)}
           >
-            <div className="font-bold text-lg mb-1.5 group-hover:text-primary transition-colors">{room.name}</div>
-            <div className="text-sm text-gray-400">
-              Host: <span className="text-gray-300">{room.hostId?.username || 'Unknown'}</span> · {room.memberIds?.length || 0}/20 members
+            <div className="w-full aspect-square bg-zinc-800 rounded-xl mb-4 flex items-center justify-center overflow-hidden shadow-lg relative flex-shrink-0">
+              <RoomCover room={room} />
             </div>
-            <div className="mt-3 text-xs text-gray-500 font-mono bg-black/30 inline-block px-2 py-1 rounded">
+            
+            <div className="font-bold text-lg mb-1 group-hover:text-primary transition-colors truncate">{room.name}</div>
+            <div className="text-sm text-gray-400 truncate">
+              Host: <span className="text-gray-300">{room.hostId?.username || 'Unknown'}</span>
+            </div>
+            <div className="mt-3 text-xs text-gray-500 font-mono bg-black/30 self-start px-2 py-1 rounded">
               Code: {room.joinCode}
             </div>
           </div>

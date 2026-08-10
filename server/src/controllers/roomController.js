@@ -59,7 +59,8 @@ async function listRooms(req, res) {
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
-        .populate('hostId', 'username'),
+        .populate('hostId', 'username')
+        .populate('trackIds', 'albumArtUrl'),
       Room.countDocuments(query),
     ]);
 
