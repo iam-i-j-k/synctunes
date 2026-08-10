@@ -16,7 +16,7 @@ export default function Layout() {
         <Sidebar />
         <div className="flex-1 flex flex-col min-w-0 bg-gradient-to-b from-green-500/10 to-zinc-950 md:rounded-tl-lg overflow-hidden animate-main-gradient bg-[length:100%_400%]">
           <Header />
-          <main className={`flex-1 flex flex-col overflow-hidden relative z-0 ${currentRoom ? 'pb-[80px] md:pb-[90px]' : 'pb-[80px] md:pb-0'}`}>
+          <main className={`flex-1 flex flex-col overflow-hidden relative z-0 ${currentRoom ? 'pb-[140px] md:pb-[90px]' : 'pb-[80px] md:pb-0'}`}>
             <Outlet />
           </main>
         </div>
