@@ -10,7 +10,13 @@ function getTrackMeta(body, file, index) {
     .replace(/[-_]/g, ' ')
     .trim();
 
-  const title = (titleValues[index] || titleValues[0] || fallbackTitle || 'Untitled').trim();
+  let title = (titleValues[index] || titleValues[0] || fallbackTitle || 'Untitled').trim();
+  
+  // Clean up common junk from downloaded mp3 file names
+  title = title
+    .replace(/NaaSongs/gi, '')
+    .replace(/\(PagalWorld\.com\.so\)/gi, '')
+    .trim();
 
   return { title };
 }

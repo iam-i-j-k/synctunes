@@ -76,8 +76,9 @@ export default function RoomHeader() {
 
   const colors = stringToGradient(currentRoom._id);
 
-  const tracksWithArt = tracks?.filter(t => t.albumArtUrl) || [];
-  const covers = tracksWithArt.slice(0, 4).map(t => t.albumArtUrl);
+  // Extract unique album art URLs to avoid duplicate images in the collage
+  const uniqueCovers = Array.from(new Set(tracks?.map(t => t.albumArtUrl).filter(Boolean)));
+  const covers = uniqueCovers.slice(0, 4);
 
   let coverContent;
   if (covers.length >= 4) {
