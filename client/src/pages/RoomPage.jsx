@@ -70,8 +70,8 @@ export default function RoomPage() {
   }, [roomId]);
 
   return (
-    <div className="flex flex-col xl:flex-row h-full">
-      <main className="flex-1 flex flex-col min-w-0 overflow-y-auto overflow-x-hidden">
+    <div className="flex flex-col xl:flex-row h-full overflow-y-auto xl:overflow-hidden">
+      <main className="flex-1 flex flex-col min-w-0 xl:overflow-y-auto overflow-visible">
         <RoomHeader />
 
         {roomError ? (
