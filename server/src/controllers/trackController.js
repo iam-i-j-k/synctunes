@@ -205,8 +205,27 @@ async function listTracks(req, res) {
 
     const tracks = await Track.find({
       $or: [{ roomId }, { _id: { $in: room.trackIds || [] } }],
-    }).sort({ createdAt: 1 });
-    return res.json({ tracks });
+    });
+
+    const trackMap = new Map();
+    tracks.forEach(t => trackMap.set(t._id.toString(), t));
+
+    const sortedTracks = [];
+    const trackIdsStrings = (room.trackIds || []).map(id => id.toString());
+
+    // Add tracks in the order of room.trackIds (source of truth for playback queue)
+    trackIdsStrings.forEach(id => {
+      if (trackMap.has(id)) {
+        sortedTracks.push(trackMap.get(id));
+        trackMap.delete(id);
+      }
+    });
+
+    // Append any remaining tracks not in trackIds (e.g. legacy/orphaned uploads)
+    const remainingTracks = Array.from(trackMap.values()).sort((a, b) => a.createdAt - b.createdAt);
+    sortedTracks.push(...remainingTracks);
+
+    return res.json({ tracks: sortedTracks });
   } catch (err) {
     console.error('listTracks error:', err);
     return res.status(500).json({ message: 'Server error' });
