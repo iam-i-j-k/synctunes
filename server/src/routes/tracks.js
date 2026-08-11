@@ -3,8 +3,6 @@ const { protect } = require('../middleware/auth');
 const { uploadAudio } = require('../middleware/upload');
 const { uploadTrack, listTracks, deleteTrack, addExistingTrack } = require('../controllers/trackController');
 
-const router = express.Router();
-
 router.use(protect);
 
 // Scoped under rooms (mounted at /api)

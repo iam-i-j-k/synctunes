@@ -283,6 +283,4 @@ async function addExistingTrack(req, res) {
     console.error('addExistingTrack error:', err);
     return res.status(500).json({ message: 'Server error' });
   }
-}
-
 module.exports = { uploadTrack, listTracks, deleteTrack, addExistingTrack };
