@@ -13,10 +13,10 @@ function getTrackMeta(body, file, index) {
   let title = (titleValues[index] || titleValues[0] || fallbackTitle || 'Untitled').trim();
   
   // Clean up common junk from downloaded mp3 file names
-  title = title
-    .replace(/NaaSongs/gi, '')
-    .replace(/\(PagalWorld\.com\.so\)/gi, '')
-    .trim();
+  title = title.replace(/[-_]?\s*\[?\(?(NaaSongs|PagalWorld|SenSongs|Masstamilan|DJMaza|Wapking|MyMp3Song|Webmusic|PagalFree)[^\]\)]*\]?\)?/gi, '');
+  title = title.replace(/_+/g, ' ');
+  title = title.replace(/-+/g, ' ');
+  title = title.replace(/\s+/g, ' ').trim();
 
   return { title };
 }
@@ -64,6 +64,7 @@ async function uploadTrack(req, res) {
       let artist = '';
       let albumArtUrl = null;
 
+      let embeddedPicture = null;
       if (mm) {
         try {
           const metadata = await mm.parseBuffer(file.buffer, file.mimetype);
@@ -81,46 +82,64 @@ async function uploadTrack(req, res) {
           }
 
           if (metadata.common.picture && metadata.common.picture.length > 0) {
-            const picture = metadata.common.picture[0];
-            const imgUploadResult = await new Promise((resolve, reject) => {
-              const stream = cloudinary.uploader.upload_stream(
-                { resource_type: 'image', folder: 'synctunes/album-art' },
-                (error, result) => {
-                  if (error) return reject(error);
-                  resolve(result);
-                }
-              );
-              stream.end(picture.data);
-            });
-            albumArtUrl = imgUploadResult.secure_url;
+            embeddedPicture = metadata.common.picture[0];
           }
         } catch(err) {
           console.warn('music-metadata parsing failed for', file.originalname, err.message);
         }
       }
 
-      if (!albumArtUrl && title) {
+      if (title) {
         try {
-          const searchQuery = encodeURIComponent(`${title} ${artist}`.trim());
-          const itunesUrl = `https://itunes.apple.com/search?term=${searchQuery}&entity=song&limit=1`;
-          
-          // Use dynamic import for node-fetch or native fetch if available
           const fetchObj = typeof fetch !== 'undefined' ? fetch : (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
-          const response = await fetchObj(itunesUrl);
           
-          if (response.ok) {
-            const data = await response.json();
-            if (data.results && data.results.length > 0) {
-              if (data.results[0].artworkUrl100) {
-                albumArtUrl = data.results[0].artworkUrl100.replace('100x100bb', '600x600bb');
-              }
-              if (!artist && data.results[0].artistName) {
-                artist = data.results[0].artistName;
+          const searchParams = [
+            { term: `${title} ${artist}`.trim(), entity: 'song' },
+            { term: title.trim(), entity: 'song' },
+            { term: title.trim(), entity: 'album' }
+          ];
+
+          let found = false;
+          for (const params of searchParams) {
+            if (!params.term || found) continue;
+            
+            const itunesUrl = `https://itunes.apple.com/search?term=${encodeURIComponent(params.term)}&entity=${params.entity}&limit=1`;
+            const response = await fetchObj(itunesUrl);
+            
+            if (response.ok) {
+              const data = await response.json();
+              if (data.results && data.results.length > 0) {
+                if (data.results[0].artworkUrl100) {
+                  albumArtUrl = data.results[0].artworkUrl100.replace('100x100bb', '600x600bb');
+                }
+                if (!artist && data.results[0].artistName) {
+                  artist = data.results[0].artistName;
+                }
+                found = true;
+                break;
               }
             }
           }
         } catch (err) {
           console.warn('iTunes API fetch failed:', err.message);
+        }
+      }
+
+      if (!albumArtUrl && embeddedPicture) {
+        try {
+          const imgUploadResult = await new Promise((resolve, reject) => {
+            const stream = cloudinary.uploader.upload_stream(
+              { resource_type: 'image', folder: 'synctunes/album-art' },
+              (error, result) => {
+                if (error) return reject(error);
+                resolve(result);
+              }
+            );
+            stream.end(embeddedPicture.data);
+          });
+          albumArtUrl = imgUploadResult.secure_url;
+        } catch (err) {
+          console.warn('Failed to upload embedded picture to cloudinary', err.message);
         }
       }
 
