@@ -29,10 +29,24 @@ async function toggleLikeTrack(req, res) {
 
 async function getLikedTracks(req, res) {
   try {
-    const user = await User.findById(req.user.userId).populate('likedTracks');
+    const user = await User.findById(req.user.userId).populate({
+      path: 'likedTracks',
+      populate: { path: 'mediaAssetId' }
+    });
     if (!user) return res.status(404).json({ message: 'User not found' });
     
-    return res.json({ tracks: user.likedTracks });
+    // Transform tracks so cloudinaryUrl/durationMs appear at top level
+    const tracks = (user.likedTracks || []).map(track => {
+      const trackObj = typeof track.toObject === 'function' ? track.toObject() : { ...track };
+      if (trackObj.mediaAssetId && typeof trackObj.mediaAssetId === 'object') {
+        trackObj.cloudinaryUrl = trackObj.mediaAssetId.cloudinaryUrl;
+        trackObj.cloudinaryPublicId = trackObj.mediaAssetId.cloudinaryPublicId;
+        trackObj.durationMs = trackObj.mediaAssetId.durationMs;
+      }
+      return trackObj;
+    });
+
+    return res.json({ tracks });
   } catch (err) {
     console.error('getLikedTracks error:', err);
     return res.status(500).json({ message: 'Server error' });

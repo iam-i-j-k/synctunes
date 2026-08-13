@@ -1,5 +1,7 @@
+const crypto = require('crypto');
 const getCloudinary = require('../config/cloudinary');
 const Track = require('../models/Track');
+const MediaAsset = require('../models/MediaAsset');
 const Room = require('../models/Room');
 
 function getTrackMeta(body, file, index) {
@@ -19,6 +21,22 @@ function getTrackMeta(body, file, index) {
   title = title.replace(/\s+/g, ' ').trim();
 
   return { title };
+}
+
+/**
+ * Flatten a populated Track doc so `cloudinaryUrl`, `cloudinaryPublicId`,
+ * and `durationMs` appear at the top level — keeping the API response
+ * shape identical for the client.
+ */
+function formatTrack(track) {
+  if (!track) return track;
+  const obj = typeof track.toObject === 'function' ? track.toObject() : { ...track };
+  if (obj.mediaAssetId && typeof obj.mediaAssetId === 'object') {
+    obj.cloudinaryUrl = obj.mediaAssetId.cloudinaryUrl;
+    obj.cloudinaryPublicId = obj.mediaAssetId.cloudinaryPublicId;
+    obj.durationMs = obj.mediaAssetId.durationMs;
+  }
+  return obj;
 }
 
 // Upload one or more audio files to Cloudinary and save Track docs
@@ -70,7 +88,6 @@ async function uploadTrack(req, res) {
           const metadata = await mm.parseBuffer(file.buffer, file.mimetype);
           
           // Use ID3 title only if the user didn't explicitly provide one in the body
-          // The body title might just be the fallback title, let's check if it matches fallback
           const titleValues = Array.isArray(req.body.title) ? req.body.title : req.body.title ? [req.body.title] : [];
           const userProvidedTitle = titleValues[index] || titleValues[0];
           
@@ -147,36 +164,55 @@ async function uploadTrack(req, res) {
         return res.status(400).json({ message: 'title is required for every upload' });
       }
 
-      const uploadResult = await new Promise((resolve, reject) => {
-        const stream = cloudinary.uploader.upload_stream(
-          { resource_type: 'video', folder: 'synctunes/tracks' },
-          (error, result) => {
-            if (error) return reject(error);
-            resolve(result);
-          }
-        );
-        stream.end(file.buffer);
-      });
+      // ── Deduplication: compute SHA-256 hash of the audio buffer ──
+      const contentHash = crypto.createHash('sha256').update(file.buffer).digest('hex');
 
-      const durationMs = Math.round((uploadResult.duration || 0) * 1000);
+      let mediaAsset = await MediaAsset.findOne({ contentHash });
+
+      if (mediaAsset) {
+        // Dedup hit — reuse existing Cloudinary file, bump refCount
+        await MediaAsset.updateOne({ _id: mediaAsset._id }, { $inc: { refCount: 1 } });
+      } else {
+        // New file — upload to Cloudinary
+        const uploadResult = await new Promise((resolve, reject) => {
+          const stream = cloudinary.uploader.upload_stream(
+            { resource_type: 'video', folder: 'synctunes/tracks' },
+            (error, result) => {
+              if (error) return reject(error);
+              resolve(result);
+            }
+          );
+          stream.end(file.buffer);
+        });
+
+        const durationMs = Math.round((uploadResult.duration || 0) * 1000);
+
+        mediaAsset = await MediaAsset.create({
+          contentHash,
+          cloudinaryUrl: uploadResult.secure_url,
+          cloudinaryPublicId: uploadResult.public_id,
+          durationMs,
+          refCount: 1,
+        });
+      }
 
       const track = await Track.create({
         roomId,
         title: title.trim(),
         artist,
         albumArtUrl,
-        cloudinaryUrl: uploadResult.secure_url,
-        cloudinaryPublicId: uploadResult.public_id,
-        durationMs,
+        mediaAssetId: mediaAsset._id,
         uploadedBy: req.user.userId,
       });
 
-      createdTracks.push(track);
+      createdTracks.push(formatTrack(
+        await Track.findById(track._id).populate('mediaAssetId')
+      ));
       room.trackIds.push(track._id);
 
       const io = req.app.locals.io;
       if (io) {
-        io.to(`room:${roomId}`).emit('room:trackAdded', { track });
+        io.to(`room:${roomId}`).emit('room:trackAdded', { track: createdTracks[createdTracks.length - 1] });
       }
     }
 
@@ -205,7 +241,7 @@ async function listTracks(req, res) {
 
     const tracks = await Track.find({
       $or: [{ roomId }, { _id: { $in: room.trackIds || [] } }],
-    });
+    }).populate('mediaAssetId');
 
     const trackMap = new Map();
     tracks.forEach(t => trackMap.set(t._id.toString(), t));
@@ -225,7 +261,7 @@ async function listTracks(req, res) {
     const remainingTracks = Array.from(trackMap.values()).sort((a, b) => a.createdAt - b.createdAt);
     sortedTracks.push(...remainingTracks);
 
-    return res.json({ tracks: sortedTracks });
+    return res.json({ tracks: sortedTracks.map(formatTrack) });
   } catch (err) {
     console.error('listTracks error:', err);
     return res.status(500).json({ message: 'Server error' });
@@ -234,7 +270,7 @@ async function listTracks(req, res) {
 
 async function deleteTrack(req, res) {
   try {
-    const track = await Track.findById(req.params.id);
+    const track = await Track.findById(req.params.id).populate('mediaAssetId');
     if (!track) return res.status(404).json({ message: 'Track not found' });
 
     const room = await Room.findById(track.roomId);
@@ -245,16 +281,35 @@ async function deleteTrack(req, res) {
       return res.status(403).json({ message: 'Not authorized to delete this track' });
     }
 
-    const cloudinary = getCloudinary();
+    // Decrement the media asset's refCount; destroy Cloudinary file if no more references
     let cloudinaryWarning = null;
-    try {
-      await cloudinary.uploader.destroy(track.cloudinaryPublicId, { resource_type: 'video' });
-    } catch (cloudErr) {
-      console.warn(`Cloudinary destroy failed for ${track.cloudinaryPublicId}:`, cloudErr);
-      cloudinaryWarning = `Cloudinary delete failed for publicId ${track.cloudinaryPublicId}. File may need manual cleanup.`;
+    if (track.mediaAssetId) {
+      const assetId = typeof track.mediaAssetId === 'object' ? track.mediaAssetId._id : track.mediaAssetId;
+      const asset = await MediaAsset.findByIdAndUpdate(
+        assetId,
+        { $inc: { refCount: -1 } },
+        { new: true }
+      );
+
+      if (asset && asset.refCount <= 0) {
+        const cloudinary = getCloudinary();
+        try {
+          await cloudinary.uploader.destroy(asset.cloudinaryPublicId, { resource_type: 'video' });
+        } catch (cloudErr) {
+          console.warn(`Cloudinary destroy failed for ${asset.cloudinaryPublicId}:`, cloudErr);
+          cloudinaryWarning = `Cloudinary delete failed for publicId ${asset.cloudinaryPublicId}. File may need manual cleanup.`;
+        }
+        await MediaAsset.findByIdAndDelete(asset._id);
+      }
     }
 
     await Track.findByIdAndDelete(track._id);
+
+    // Remove from room's trackIds array
+    if (room) {
+      room.trackIds = room.trackIds.filter(id => id.toString() !== track._id.toString());
+      await room.save();
+    }
 
     // Broadcast deletion to room
     const io = req.app.locals.io;
@@ -284,7 +339,7 @@ async function addExistingTrack(req, res) {
       room.memberIds.some((id) => id.toString() === req.user.userId);
     if (!isMember) return res.status(403).json({ message: 'You are not a member of this room' });
 
-    const track = await Track.findById(trackId);
+    const track = await Track.findById(trackId).populate('mediaAssetId');
     if (!track) return res.status(404).json({ message: 'Track not found' });
 
     if (!room.trackIds.includes(track._id)) {
@@ -293,11 +348,11 @@ async function addExistingTrack(req, res) {
       
       const io = req.app.locals.io;
       if (io) {
-        io.to(`room:${roomId}`).emit('room:trackAdded', { track });
+        io.to(`room:${roomId}`).emit('room:trackAdded', { track: formatTrack(track) });
       }
     }
 
-    return res.json({ track });
+    return res.json({ track: formatTrack(track) });
   } catch (err) {
     console.error('addExistingTrack error:', err);
     return res.status(500).json({ message: 'Server error' });

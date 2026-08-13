@@ -22,18 +22,10 @@ const trackSchema = new mongoose.Schema(
     albumArtUrl: {
       type: String,
     },
-    cloudinaryUrl: {
-      type: String,
+    mediaAssetId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'MediaAsset',
       required: true,
-    },
-    cloudinaryPublicId: {
-      type: String,
-      required: true,
-    },
-    durationMs: {
-      type: Number,
-      required: true,
-      min: 0,
     },
     uploadedBy: {
       type: mongoose.Schema.Types.ObjectId,

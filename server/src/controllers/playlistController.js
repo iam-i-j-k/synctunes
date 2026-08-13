@@ -32,9 +32,25 @@ async function getPlaylists(req, res) {
 
 async function getPlaylist(req, res) {
   try {
-    const playlist = await Playlist.findOne({ _id: req.params.id, userId: req.user.userId }).populate('trackIds');
+    const playlist = await Playlist.findOne({ _id: req.params.id, userId: req.user.userId })
+      .populate({
+        path: 'trackIds',
+        populate: { path: 'mediaAssetId' },
+      });
     if (!playlist) return res.status(404).json({ message: 'Playlist not found' });
-    return res.json({ playlist });
+
+    // Transform tracks so cloudinaryUrl/durationMs appear at top level
+    const playlistObj = playlist.toObject();
+    playlistObj.trackIds = (playlistObj.trackIds || []).map(track => {
+      if (track && track.mediaAssetId && typeof track.mediaAssetId === 'object') {
+        track.cloudinaryUrl = track.mediaAssetId.cloudinaryUrl;
+        track.cloudinaryPublicId = track.mediaAssetId.cloudinaryPublicId;
+        track.durationMs = track.mediaAssetId.durationMs;
+      }
+      return track;
+    });
+
+    return res.json({ playlist: playlistObj });
   } catch (err) {
     console.error('getPlaylist error:', err);
     return res.status(500).json({ message: 'Server error' });

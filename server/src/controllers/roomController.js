@@ -1,5 +1,6 @@
 const Room = require('../models/Room');
 const Track = require('../models/Track');
+const MediaAsset = require('../models/MediaAsset');
 const getCloudinary = require('../config/cloudinary');
 const { generateJoinCode } = require('../utils/joinCode');
 
@@ -125,23 +126,31 @@ async function deleteRoom(req, res) {
       return res.status(403).json({ message: 'Only the host can delete the room' });
     }
 
-    // Cascade delete: fetch all tracks and destroy from Cloudinary
+    // Cascade delete: decrement MediaAsset refCounts, destroy Cloudinary files only when orphaned
     const tracks = await Track.find({ roomId: room._id });
     const cloudinary = getCloudinary();
-    const cloudinaryResults = await Promise.allSettled(
-      tracks.map((t) =>
-        cloudinary.uploader.destroy(t.cloudinaryPublicId, { resource_type: 'video' })
-      )
-    );
 
-    cloudinaryResults.forEach((result, i) => {
-      if (result.status === 'rejected') {
-        console.warn(
-          `Cloudinary destroy failed for publicId ${tracks[i].cloudinaryPublicId}:`,
-          result.reason
+    for (const track of tracks) {
+      if (track.mediaAssetId) {
+        const asset = await MediaAsset.findByIdAndUpdate(
+          track.mediaAssetId,
+          { $inc: { refCount: -1 } },
+          { new: true }
         );
+
+        if (asset && asset.refCount <= 0) {
+          try {
+            await cloudinary.uploader.destroy(asset.cloudinaryPublicId, { resource_type: 'video' });
+          } catch (cloudErr) {
+            console.warn(
+              `Cloudinary destroy failed for publicId ${asset.cloudinaryPublicId}:`,
+              cloudErr
+            );
+          }
+          await MediaAsset.findByIdAndDelete(asset._id);
+        }
       }
-    });
+    }
 
     await Track.deleteMany({ roomId: room._id });
     await Room.findByIdAndDelete(room._id);
