@@ -170,6 +170,14 @@ async function uploadTrack(req, res) {
       let mediaAsset = await MediaAsset.findOne({ contentHash });
 
       if (mediaAsset) {
+        // Check if the exact same song is already in this room
+        const existingTrack = await Track.findOne({ roomId, mediaAssetId: mediaAsset._id });
+        if (existingTrack) {
+          // It's already in the room. Just return the existing track silently.
+          createdTracks.push(formatTrack(await existingTrack.populate('mediaAssetId')));
+          continue; // Skip creating a new Track and don't increment refCount
+        }
+        
         // Dedup hit — reuse existing Cloudinary file, bump refCount
         await MediaAsset.updateOne({ _id: mediaAsset._id }, { $inc: { refCount: 1 } });
       } else {
