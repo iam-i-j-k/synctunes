@@ -10,12 +10,30 @@ import RoomHeader from '../components/RoomHeader';
 import MemberList from '../components/MemberList';
 import TrackList from '../components/TrackList';
 import TrackUpload from '../components/TrackUpload';
+import { Play, Pause } from 'lucide-react';
 
 export default function RoomPage() {
   const { id: roomId } = useParams();
   const navigate = useNavigate();
-  const { setRoom, setMembers, setTracks, addTrack, removeTrack, clearRoom } = useRoomStore();
-  const { applyPlaybackUpdate, clearPlayer } = usePlayerStore();
+  const { currentRoom, tracks, setRoom, setMembers, setTracks, addTrack, removeTrack, clearRoom } = useRoomStore();
+  const { playbackState, actionSequence, currentTrackId, applyPlaybackUpdate, clearPlayer } = usePlayerStore();
+
+  function handlePlayPauseRoom() {
+    if (!currentRoom) return;
+    if (playbackState.isPlaying) {
+      socket.emit('playback:pause', { roomId: currentRoom._id, actionSequence });
+    } else {
+      if (currentTrackId) {
+        socket.emit('playback:play', { roomId: currentRoom._id, actionSequence });
+      } else if (tracks && tracks.length > 0) {
+        socket.emit('playback:trackChange', {
+          roomId: currentRoom._id,
+          trackId: tracks[0]._id,
+          actionSequence
+        });
+      }
+    }
+  }
   const [loadingRoom, setLoadingRoom] = useState(true);
   const [roomError, setRoomError] = useState('');
 
@@ -84,9 +102,20 @@ export default function RoomPage() {
             <p className="text-gray-400 animate-pulse font-medium">Entering Room...</p>
           </div>
         ) : (
-          <div className="flex flex-col flex-1 px-4 md:px-8 py-6">
-            <TrackUpload />
-            <TrackList />
+          <div className="flex flex-col flex-1">
+            <div className="flex items-center gap-6 px-4 md:px-8 py-4 pb-2 mt-2">
+               <button 
+                 className="w-14 h-14 bg-primary text-black rounded-full flex items-center justify-center hover:scale-105 transition-transform shadow-xl"
+                 onClick={handlePlayPauseRoom}
+                 title={playbackState.isPlaying ? 'Pause Room' : 'Play Room'}
+               >
+                 {playbackState.isPlaying ? <Pause size={28} fill="currentColor" /> : <Play size={28} fill="currentColor" className="ml-1" />}
+               </button>
+            </div>
+            <div className="flex flex-col flex-1 px-4 md:px-8 py-4 pt-0">
+              <TrackUpload />
+              <TrackList />
+            </div>
           </div>
         )}
       </main>
