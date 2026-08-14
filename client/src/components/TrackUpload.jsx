@@ -153,7 +153,7 @@ export default function TrackUpload() {
   const allSuccess = uploadItems.length > 0 && uploadItems.every(item => item.status === 'success');
 
   return (
-    <div className="px-4 py-4 md:px-6">
+    <>
       <button 
         className="px-6 py-3 bg-white hover:bg-gray-200 text-black font-bold rounded-full flex items-center justify-center gap-2 transition-transform hover:scale-105 shadow-[0_8px_16px_rgba(255,255,255,0.1)] w-full md:w-auto" 
         onClick={() => setIsModalOpen(true)}
@@ -299,6 +299,6 @@ export default function TrackUpload() {
         </div>,
         document.body
       )}
-    </div>
+    </>
   );
 }

@@ -105,15 +105,16 @@ export default function RoomPage() {
           <div className="flex flex-col flex-1">
             <div className="flex items-center gap-6 px-4 md:px-8 py-4 pb-2 mt-2">
                <button 
-                 className="w-14 h-14 bg-primary text-black rounded-full flex items-center justify-center hover:scale-105 transition-transform shadow-xl"
+                 className="w-14 h-14 bg-primary text-black rounded-full flex items-center justify-center hover:scale-105 transition-transform shadow-xl flex-shrink-0"
                  onClick={handlePlayPauseRoom}
                  title={playbackState.isPlaying ? 'Pause Room' : 'Play Room'}
                >
                  {playbackState.isPlaying ? <Pause size={28} fill="currentColor" /> : <Play size={28} fill="currentColor" className="ml-1" />}
                </button>
+               
+               <TrackUpload />
             </div>
             <div className="flex flex-col flex-1 px-4 md:px-8 py-4 pt-0">
-              <TrackUpload />
               <TrackList />
             </div>
           </div>
