@@ -32,6 +32,7 @@ function stringToGradient(str = '') {
 export default function AudioPlayer() {
   const audioRef = useRef(null);
   const seekingRef = useRef(false);
+  const prevVolumeRef = useRef(1);
 
   const { currentRoom } = useRoomStore();
   const {
@@ -109,6 +110,12 @@ export default function AudioPlayer() {
       }
     }
   }, [playbackState, currentTrackId]);
+
+  useEffect(() => {
+    if (audioRef.current) {
+      audioRef.current.volume = volume;
+    }
+  }, [volume, currentTrackId]);
 
   useEffect(() => {
     function handlePlaybackUpdate({ playbackState: ps, actionSequence: seq, currentTrackId: tid }) {
@@ -235,19 +242,22 @@ export default function AudioPlayer() {
   function handleVolumeChange(e) {
     const v = parseFloat(e.target.value);
     setVolume(v);
+    if (v > 0) prevVolumeRef.current = v;
     localStorage.setItem('synctunes_volume', v);
     if (audioRef.current) audioRef.current.volume = v;
   }
 
   function toggleMute() {
     if (volume > 0) {
+      prevVolumeRef.current = volume;
       setVolume(0);
       localStorage.setItem('synctunes_volume', 0);
       if (audioRef.current) audioRef.current.volume = 0;
     } else {
-      setVolume(1);
-      localStorage.setItem('synctunes_volume', 1);
-      if (audioRef.current) audioRef.current.volume = 1;
+      const v = prevVolumeRef.current > 0 ? prevVolumeRef.current : 1;
+      setVolume(v);
+      localStorage.setItem('synctunes_volume', v);
+      if (audioRef.current) audioRef.current.volume = v;
     }
   }
 
@@ -447,7 +457,7 @@ export default function AudioPlayer() {
             </div>
             {/* Custom thumb on hover */}
             <div 
-              className="absolute h-3 w-3 bg-white rounded-full shadow-md opacity-0 group-hover/slider:opacity-100 transition-opacity pointer-events-none -ml-1.5 z-10" 
+              className="absolute h-3 w-3 bg-white rounded-full shadow-md opacity-100 pointer-events-none -ml-1.5 z-10" 
               style={{ left: `${seekPercentage}%` }}
             />
             <input
@@ -489,7 +499,7 @@ export default function AudioPlayer() {
               <div className="h-full bg-white group-hover/vol:bg-primary transition-colors" style={{ width: `${volumePercentage}%` }} />
             </div>
             <div 
-              className="absolute h-3 w-3 bg-white rounded-full shadow-md opacity-0 group-hover/vol:opacity-100 transition-opacity pointer-events-none -ml-1.5 z-10" 
+              className="absolute h-3 w-3 bg-white rounded-full shadow-md opacity-100 pointer-events-none -ml-1.5 z-10" 
               style={{ left: `${volumePercentage}%` }}
             />
             <input

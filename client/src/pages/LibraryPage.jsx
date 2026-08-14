@@ -273,7 +273,7 @@ export default function LibraryPage() {
                     onContextMenu={(e) => handleContextMenu(e, track)}
                   >
                     <div className="w-8 text-right text-gray-400 group-hover:hidden">{i + 1}</div>
-                    <div className="w-8 text-right hidden group-hover:block" onClick={(e) => { e.stopPropagation(); addAndPlayTrack(track._id); }}>
+                    <div className="w-8 text-right block" onClick={(e) => { e.stopPropagation(); addAndPlayTrack(track._id); }}>
                       <Play size={16} fill="currentColor" className="text-white" />
                     </div>
                     <div className="flex-1">
@@ -329,7 +329,7 @@ export default function LibraryPage() {
                     <div className="w-full aspect-square bg-zinc-700 rounded-lg mb-4 flex items-center justify-center shadow-lg relative">
                       <Music size={32} className="text-white/20" />
                       <div 
-                        className="absolute bottom-2 right-2 w-10 h-10 bg-primary rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transform translate-y-2 group-hover:translate-y-0 transition-all shadow-xl"
+                        className="absolute bottom-2 right-2 w-10 h-10 bg-primary rounded-full flex items-center justify-center opacity-100 transform transition-all shadow-xl"
                         onClick={(e) => {
                           e.stopPropagation();
                           if (playlist.trackIds && playlist.trackIds.length > 0) {
@@ -396,11 +396,11 @@ export default function LibraryPage() {
                               onClick={() => addAndPlayTrack(track._id)}
                               onContextMenu={(e) => handleContextMenu(e, track)}
                             >
-                              <div {...provided.dragHandleProps} className="text-gray-600 hover:text-white cursor-grab active:cursor-grabbing w-6 hidden group-hover:flex justify-center">
+                              <div {...provided.dragHandleProps} className="text-gray-600 hover:text-white cursor-grab active:cursor-grabbing w-6 flex justify-center">
                                 <GripVertical size={16} />
                               </div>
                               <div className="w-8 text-right text-gray-400 group-hover:hidden">{i + 1}</div>
-                              <div className="w-8 text-right hidden group-hover:block" onClick={(e) => { e.stopPropagation(); addAndPlayTrack(track._id); }}>
+                              <div className="w-8 text-right block" onClick={(e) => { e.stopPropagation(); addAndPlayTrack(track._id); }}>
                                 <Play size={16} fill="currentColor" className="text-white" />
                               </div>
                               <div className="flex-1 min-w-0">
@@ -408,7 +408,7 @@ export default function LibraryPage() {
                                 {track.artist && <div className="text-[11px] text-gray-400 truncate">{track.artist}</div>}
                               </div>
                               <button 
-                                className="p-2 text-gray-500 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+                                className="p-2 text-gray-500 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors opacity-100"
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   handleRemoveFromPlaylist(track._id);

@@ -45,7 +45,7 @@ export default function MemberList() {
               {isHost && !isThisHost && !isMe && (
                 <button
                   type="button"
-                  className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-white/10 rounded-lg transition-all opacity-0 group-hover:opacity-100 flex-shrink-0"
+                  className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-white/10 rounded-lg transition-all opacity-100 flex-shrink-0"
                   onClick={() => handleKick(m.userId)}
                   title={`Kick ${m.username}`}
                 >

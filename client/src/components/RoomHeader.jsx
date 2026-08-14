@@ -137,7 +137,7 @@ export default function RoomHeader() {
             <h1 className="text-4xl md:text-7xl font-extrabold text-white tracking-tighter truncate max-w-[250px] md:max-w-[600px]">{currentRoom.name}</h1>
             {isHost && (
               <button
-                className="p-2 text-white/30 hover:text-white transition-colors opacity-100 md:opacity-0 md:group-hover:opacity-100"
+                className="p-2 text-white/30 hover:text-white transition-colors opacity-100"
                 onClick={() => { setNewName(currentRoom.name); setRenaming(true); }}
                 title="Rename room"
               >
