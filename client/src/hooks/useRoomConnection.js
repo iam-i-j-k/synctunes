@@ -61,6 +61,26 @@ export function useRoomConnection() {
       applyPlaybackUpdate(playbackState, actionSequence, currentTrackId, playbackMode);
     }
 
+    function onTrackOrderChanged({ trackIds }) {
+      const { tracks, setTracks } = useRoomStore.getState();
+      if (!tracks || tracks.length === 0) return;
+      
+      const newTracks = [];
+      for (const id of trackIds) {
+        const t = tracks.find(track => track._id === id);
+        if (t) newTracks.push(t);
+      }
+      
+      // Keep any tracks that might not be in trackIds (e.g. newly added) at the end
+      for (const t of tracks) {
+        if (!trackIds.includes(t._id)) {
+          newTracks.push(t);
+        }
+      }
+      
+      setTracks(newTracks);
+    }
+
     function onStaleAction({ currentState, actionSequence }) {
       applyPlaybackUpdate(currentState.playbackState, actionSequence, currentState.currentTrackId, currentState.playbackMode);
     }
@@ -72,6 +92,7 @@ export function useRoomConnection() {
     socket.on('room:updated', onRoomUpdated);
     socket.on('room:trackAdded', onTrackAdded);
     socket.on('room:trackRemoved', onTrackRemoved);
+    socket.on('room:trackOrderChanged', onTrackOrderChanged);
     socket.on('playback:update', onPlaybackUpdate);
     socket.on('room:staleAction', onStaleAction);
 
@@ -83,6 +104,7 @@ export function useRoomConnection() {
       socket.off('room:updated', onRoomUpdated);
       socket.off('room:trackAdded', onTrackAdded);
       socket.off('room:trackRemoved', onTrackRemoved);
+      socket.off('room:trackOrderChanged', onTrackOrderChanged);
       socket.off('playback:update', onPlaybackUpdate);
       socket.off('room:staleAction', onStaleAction);
     };
