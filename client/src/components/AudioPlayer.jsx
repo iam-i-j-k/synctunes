@@ -101,12 +101,16 @@ export default function AudioPlayer() {
       // For minor desyncs, useDriftCorrection will smoothly speed up/slow down the audio to align perfectly!
       if (audio.readyState > 0 && Math.abs(audio.currentTime - positionSec) > 2.0) {
         audio.currentTime = positionSec;
+        setCurrentTime(positionSec);
       }
       audio.play().catch(() => {});
     } else {
       audio.pause();
       if (audio.readyState > 0 && Math.abs(audio.currentTime - positionSec) > 0.5) {
         audio.currentTime = positionSec;
+        setCurrentTime(positionSec);
+      } else if (audio.readyState > 0) {
+        setCurrentTime(audio.currentTime);
       }
     }
   }, [playbackState, currentTrackId]);
@@ -156,9 +160,10 @@ export default function AudioPlayer() {
       // Apply initial drift correction as soon as metadata loads to prevent start-flicker
       const positionMs = usePlayerStore.getState().getAuthorisedPositionMs();
       const positionSec = positionMs / 1000;
-      if (Math.abs(audio.currentTime - positionSec) > 2.0) {
+      if (Math.abs(audio.currentTime - positionSec) > 0.5) {
         audio.currentTime = positionSec;
       }
+      setCurrentTime(audio.currentTime);
     }
 
     function onDurationChange() {
