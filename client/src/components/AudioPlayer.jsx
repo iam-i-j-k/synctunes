@@ -82,6 +82,14 @@ export default function AudioPlayer() {
     }
   }, [currentTrack?.title, currentTrack?.artist, isMobileExpanded]);
 
+  useEffect(() => {
+    if (playbackState.isPlaying && currentTrack?.title) {
+      document.title = currentTrack.title;
+    } else {
+      document.title = 'SyncTunes';
+    }
+  }, [playbackState.isPlaying, currentTrack?.title]);
+
   const displayDuration = duration || (currentTrack?.durationMs ? currentTrack.durationMs / 1000 : 0);
 
   const { user, updateUser } = useAuthStore();
@@ -101,14 +109,14 @@ export default function AudioPlayer() {
       // For minor desyncs, useDriftCorrection will smoothly speed up/slow down the audio to align perfectly!
       if (audio.readyState > 0 && Math.abs(audio.currentTime - positionSec) > 2.0) {
         audio.currentTime = positionSec;
-        setCurrentTime(positionSec);
+        setCurrentTime(audio.currentTime);
       }
       audio.play().catch(() => {});
     } else {
       audio.pause();
       if (audio.readyState > 0 && Math.abs(audio.currentTime - positionSec) > 0.5) {
         audio.currentTime = positionSec;
-        setCurrentTime(positionSec);
+        setCurrentTime(audio.currentTime);
       } else if (audio.readyState > 0) {
         setCurrentTime(audio.currentTime);
       }
