@@ -230,6 +230,57 @@ export default function AudioPlayer() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [currentTrack, playbackState.isPlaying, roomId, actionSequence]);
 
+  useEffect(() => {
+    if ('mediaSession' in navigator && currentTrack) {
+      navigator.mediaSession.metadata = new window.MediaMetadata({
+        title: currentTrack.title,
+        artist: currentTrack.artist || 'SyncTunes Room',
+        album: 'SyncTunes',
+        artwork: currentTrack.albumArtUrl ? [
+          { src: currentTrack.albumArtUrl, sizes: '96x96', type: 'image/jpeg' },
+          { src: currentTrack.albumArtUrl, sizes: '128x128', type: 'image/jpeg' },
+          { src: currentTrack.albumArtUrl, sizes: '192x192', type: 'image/jpeg' },
+          { src: currentTrack.albumArtUrl, sizes: '256x256', type: 'image/jpeg' },
+          { src: currentTrack.albumArtUrl, sizes: '384x384', type: 'image/jpeg' },
+          { src: currentTrack.albumArtUrl, sizes: '512x512', type: 'image/jpeg' }
+        ] : [
+          { src: '/vite.svg', sizes: '512x512', type: 'image/svg+xml' } // Fallback
+        ]
+      });
+
+      navigator.mediaSession.setActionHandler('play', () => {
+        socket.emit('playback:play', { roomId, actionSequence });
+      });
+      navigator.mediaSession.setActionHandler('pause', () => {
+        socket.emit('playback:pause', { roomId, actionSequence });
+      });
+      navigator.mediaSession.setActionHandler('previoustrack', () => {
+        socket.emit('playback:prev', { roomId, actionSequence });
+      });
+      navigator.mediaSession.setActionHandler('nexttrack', () => {
+        socket.emit('playback:next', { roomId, actionSequence });
+      });
+      navigator.mediaSession.setActionHandler('seekto', (details) => {
+        if (audioRef.current) {
+          const seekTime = details.seekTime;
+          audioRef.current.currentTime = seekTime;
+          setCurrentTime(seekTime);
+          socket.emit('playback:seek', {
+            roomId,
+            actionSequence,
+            positionMs: Math.round(seekTime * 1000),
+          });
+        }
+      });
+    }
+  }, [currentTrack, roomId, actionSequence]);
+
+  useEffect(() => {
+    if ('mediaSession' in navigator) {
+      navigator.mediaSession.playbackState = playbackState.isPlaying ? 'playing' : 'paused';
+    }
+  }, [playbackState.isPlaying]);
+
   function handleSeekStart(e) {
     seekingRef.current = true;
     setSeeking(true);
