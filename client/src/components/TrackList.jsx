@@ -52,9 +52,9 @@ export default function TrackList() {
 
   async function handleDelete(track) {
     try {
-      await api.delete(`/tracks/${track._id}`);
+      await api.delete(`/tracks/${track._id}?roomId=${currentRoom._id}`);
       removeTrack(track._id);
-      toast.success('Track deleted');
+      toast.success('Track removed');
     } catch (err) {
       console.error('Delete track failed:', err);
       toast.error('Failed to delete track');

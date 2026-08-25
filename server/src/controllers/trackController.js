@@ -278,57 +278,67 @@ async function listTracks(req, res) {
 
 async function deleteTrack(req, res) {
   try {
+    const targetRoomId = req.query.roomId;
+    if (!targetRoomId) {
+      return res.status(400).json({ message: 'roomId query parameter is required' });
+    }
+
     const track = await Track.findById(req.params.id).populate('mediaAssetId');
     if (!track) return res.status(404).json({ message: 'Track not found' });
 
-    const room = await Room.findById(track.roomId);
+    const room = await Room.findById(targetRoomId);
+    if (!room) return res.status(404).json({ message: 'Room not found' });
+
     const isUploader = track.uploadedBy.toString() === req.user.userId;
-    const isHost = room && room.hostId.toString() === req.user.userId;
+    const isHost = room.hostId.toString() === req.user.userId;
 
     if (!isUploader && !isHost) {
-      return res.status(403).json({ message: 'Not authorized to delete this track' });
+      return res.status(403).json({ message: 'Not authorized to remove this track from the room' });
     }
 
-    // Decrement the media asset's refCount; destroy Cloudinary file if no more references
-    let cloudinaryWarning = null;
-    if (track.mediaAssetId) {
-      const assetId = typeof track.mediaAssetId === 'object' ? track.mediaAssetId._id : track.mediaAssetId;
-      const asset = await MediaAsset.findByIdAndUpdate(
-        assetId,
-        { $inc: { refCount: -1 } },
-        { new: true }
-      );
+    // 1. Remove from the target room's trackIds array
+    room.trackIds = room.trackIds.filter(id => id.toString() !== track._id.toString());
+    await room.save();
 
-      if (asset && asset.refCount <= 0) {
-        const cloudinary = getCloudinary();
-        try {
-          await cloudinary.uploader.destroy(asset.cloudinaryPublicId, { resource_type: 'video' });
-        } catch (cloudErr) {
-          console.warn(`Cloudinary destroy failed for ${asset.cloudinaryPublicId}:`, cloudErr);
-          cloudinaryWarning = `Cloudinary delete failed for publicId ${asset.cloudinaryPublicId}. File may need manual cleanup.`;
-        }
-        await MediaAsset.findByIdAndDelete(asset._id);
-      }
-    }
-
-    await Track.findByIdAndDelete(track._id);
-
-    // Remove from room's trackIds array
-    if (room) {
-      room.trackIds = room.trackIds.filter(id => id.toString() !== track._id.toString());
-      await room.save();
-    }
-
-    // Broadcast deletion to room
+    // 2. Broadcast removal to the room
     const io = req.app.locals.io;
     if (io) {
-      io.to(`room:${track.roomId}`).emit('room:trackRemoved', { trackId: track._id });
+      io.to(`room:${targetRoomId}`).emit('room:trackRemoved', { trackId: track._id });
+    }
+
+    // 3. Check if the track is still referenced in ANY room
+    const isTrackUsedElsewhere = await Room.exists({ trackIds: track._id });
+    
+    let cloudinaryWarning = null;
+    
+    // 4. Garbage collect if no longer used
+    if (!isTrackUsedElsewhere) {
+      if (track.mediaAssetId) {
+        const assetId = typeof track.mediaAssetId === 'object' ? track.mediaAssetId._id : track.mediaAssetId;
+        const asset = await MediaAsset.findByIdAndUpdate(
+          assetId,
+          { $inc: { refCount: -1 } },
+          { new: true }
+        );
+
+        if (asset && asset.refCount <= 0) {
+          const cloudinary = getCloudinary();
+          try {
+            await cloudinary.uploader.destroy(asset.cloudinaryPublicId, { resource_type: 'video' });
+          } catch (cloudErr) {
+            console.warn(`Cloudinary destroy failed for ${asset.cloudinaryPublicId}:`, cloudErr);
+            cloudinaryWarning = `Cloudinary delete failed for publicId ${asset.cloudinaryPublicId}. File may need manual cleanup.`;
+          }
+          await MediaAsset.findByIdAndDelete(asset._id);
+        }
+      }
+      await Track.findByIdAndDelete(track._id);
     }
 
     if (cloudinaryWarning) {
-      return res.status(207).json({ message: 'Track deleted with warning', warning: cloudinaryWarning });
+      return res.status(207).json({ message: 'Track removed with warning', warning: cloudinaryWarning });
     }
-    return res.json({ message: 'Track deleted' });
+    return res.json({ message: 'Track removed from room' });
   } catch (err) {
     console.error('deleteTrack error:', err);
     return res.status(500).json({ message: 'Server error' });
