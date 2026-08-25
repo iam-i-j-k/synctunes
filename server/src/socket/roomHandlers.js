@@ -53,9 +53,13 @@ function registerRoomHandlers(io, socket, roomCache) {
       }
 
       const state = roomCache.get(roomId);
+      const sockets = await io.in(`room:${roomId}`).fetchSockets();
+      const onlineIds = new Set(sockets.map((s) => s.data?.user?.userId));
+      onlineIds.add(userId); // the joining user is obviously online
       const members = room.memberIds.map((m) => ({
         userId: m._id.toString(),
         username: m.username,
+        isOnline: onlineIds.has(m._id.toString()),
       }));
 
       // Send full state to the joining socket
@@ -110,19 +114,40 @@ function registerRoomHandlers(io, socket, roomCache) {
     }
   });
 
-  // Handle disconnect — with grace period to avoid flicker on quick reconnects
-  socket.on('disconnect', async () => {
+  // Handle disconnecting — with grace period to avoid flicker on quick reconnects
+  socket.on('disconnecting', async () => {
     // Find all room channels this socket was in
     const rooms = [...socket.rooms].filter((r) => r.startsWith('room:'));
     for (const roomChannel of rooms) {
       const roomId = roomChannel.replace('room:', '');
+      
+      // Update online status immediately
+      broadcastMemberStatus(io, roomId);
+
       const timer = setTimeout(() => {
         disconnectTimers.delete(socket.id);
-        handleLeave(io, socket, roomId, userId);
+        // We do NOT call handleLeave here because we want offline users to stay in the room list!
       }, DISCONNECT_GRACE_MS);
       disconnectTimers.set(socket.id, timer);
     }
   });
+}
+
+async function broadcastMemberStatus(io, roomId) {
+  try {
+    const room = await Room.findById(roomId).populate('memberIds', 'username');
+    if (!room) return;
+    const sockets = await io.in(`room:${roomId}`).fetchSockets();
+    const onlineIds = new Set(sockets.map((s) => s.data?.user?.userId));
+    const members = room.memberIds.map((m) => ({
+      userId: m._id.toString(),
+      username: m.username,
+      isOnline: onlineIds.has(m._id.toString()),
+    }));
+    io.to(`room:${roomId}`).emit('room:memberUpdate', { members });
+  } catch (err) {
+    console.error('broadcastMemberStatus error:', err);
+  }
 }
 
 async function handleLeave(io, socket, roomId, userId) {
@@ -138,9 +163,12 @@ async function handleLeave(io, socket, roomId, userId) {
 
     if (!room) return;
 
+    const sockets = await io.in(`room:${roomId}`).fetchSockets();
+    const onlineIds = new Set(sockets.map((s) => s.data?.user?.userId));
     const members = room.memberIds.map((m) => ({
       userId: m._id.toString(),
       username: m.username,
+      isOnline: onlineIds.has(m._id.toString()),
     }));
 
     io.to(`room:${roomId}`).emit('room:memberUpdate', { members });

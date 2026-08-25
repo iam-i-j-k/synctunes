@@ -30,8 +30,12 @@ export default function MemberList() {
           const isThisHost = m.userId === hostId;
           const isMe = m.userId === user?.id;
           return (
-            <li key={m.userId} className="flex items-center gap-3 p-2.5 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 transition-colors group">
-              <span className="w-2.5 h-2.5 rounded-full bg-primary shadow-[0_0_8px_rgba(30,215,96,0.8)]" />
+            <li key={m.userId} className={`flex items-center gap-3 p-2.5 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 transition-colors group ${!m.isOnline && !isMe ? 'opacity-50' : 'opacity-100'}`}>
+              {m.isOnline || isMe ? (
+                <span className="w-2.5 h-2.5 rounded-full bg-primary shadow-[0_0_8px_rgba(30,215,96,0.8)]" />
+              ) : (
+                <span className="w-2.5 h-2.5 rounded-full bg-gray-500/50" />
+              )}
               {isThisHost ? <Crown size={16} className="text-primary flex-shrink-0" /> : <UserIcon size={16} className="text-gray-400 flex-shrink-0" />}
               <div className="flex-1 min-w-0 truncate text-sm">
                 <strong className="font-semibold text-gray-200">{m.username}</strong>

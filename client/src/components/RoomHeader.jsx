@@ -161,7 +161,7 @@ export default function RoomHeader() {
 
         <div className="flex flex-wrap items-center gap-3 mt-2">
           <div className="flex items-center text-sm font-medium text-gray-300">
-             Host: {isHost ? 'You' : 'Member'}
+             Host: {isHost ? 'You' : (currentRoom.hostId?.username || 'Unknown')}
           </div>
           <span className="text-white/20 hidden md:inline">•</span>
           <div className="flex items-center text-sm font-medium text-gray-300">
