@@ -155,11 +155,13 @@ export default function RoomHeader() {
             {renameError && <span className="text-red-500 text-sm font-medium w-full mt-2">{renameError}</span>}
           </form>
         ) : (
-          <div className="flex items-center gap-2 group">
-            <h1 className="text-4xl md:text-7xl font-extrabold text-white tracking-tighter truncate max-w-[250px] md:max-w-[600px]">{currentRoom.name}</h1>
+          <div className="flex items-center justify-center md:justify-start gap-2 group w-full px-4 md:px-0">
+            <h1 className="text-4xl md:text-7xl font-extrabold text-white tracking-tighter line-clamp-2 break-words text-center md:text-left">
+              {currentRoom.name}
+            </h1>
             {isHost && (
               <button
-                className="p-2 text-white/30 hover:text-white transition-colors opacity-100"
+                className="p-2 text-white/30 hover:text-white transition-colors opacity-100 flex-shrink-0"
                 onClick={() => { setNewName(currentRoom.name); setRenaming(true); }}
                 title="Rename room"
               >
@@ -169,7 +171,7 @@ export default function RoomHeader() {
           </div>
         )}
 
-        <div className="flex flex-wrap items-center gap-3 mt-2">
+        <div className="flex flex-wrap items-center justify-center md:justify-start gap-3 mt-2">
           <div className="flex items-center text-sm font-medium text-gray-300">
              Host: {isHost ? 'You' : (currentRoom.hostId?.username || 'Unknown')}
           </div>
@@ -185,7 +187,9 @@ export default function RoomHeader() {
               </div>
             </>
           )}
-          <span className="text-white/20 hidden md:inline">•</span>
+          
+          <div className="w-full h-0 md:hidden" /> {/* Force break on mobile for buttons */}
+          
           <button
             className="flex items-center gap-2 px-3 py-1.5 bg-white/10 hover:bg-white/20 rounded-full text-xs font-bold text-white transition-colors"
             onClick={copyCode}
@@ -219,37 +223,37 @@ export default function RoomHeader() {
               {currentRoom.isPrivate ? 'PRIVATE' : 'PUBLIC'}
             </div>
           )}
-        </div>
-      </div>
 
-      <div className="flex items-center gap-2 w-full md:w-auto justify-center md:justify-end mt-4 md:mt-0">
-        {isHost && !confirmDelete && (
-          <button 
-            className="p-3 text-white/50 hover:text-red-500 hover:bg-white/5 rounded-full transition-colors" 
-            onClick={() => setConfirmDelete(true)}
-            title="Delete Room"
-          >
-            <Trash2 size={22} />
-          </button>
-        )}
-        {confirmDelete && (
-          <div className="flex items-center gap-2 bg-black/40 rounded-full py-1 px-2 border border-red-500/30">
-            <span className="text-sm text-gray-300 px-2 font-medium">Delete?</span>
-            <button className="px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white rounded-full text-xs font-bold transition-colors" onClick={handleDelete}>
-              Yes
-            </button>
-            <button className="px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white rounded-full text-xs font-bold transition-colors" onClick={() => setConfirmDelete(false)}>
-              No
+          <div className="flex items-center gap-1 ml-0 md:ml-4 border-l-0 md:border-l md:border-white/10 pl-0 md:pl-4">
+            {isHost && !confirmDelete && (
+              <button 
+                className="p-2 text-white/50 hover:text-red-500 hover:bg-white/5 rounded-full transition-colors" 
+                onClick={() => setConfirmDelete(true)}
+                title="Delete Room"
+              >
+                <Trash2 size={18} />
+              </button>
+            )}
+            {confirmDelete && (
+              <div className="flex items-center gap-2 bg-red-500/10 rounded-full py-1 px-2 border border-red-500/30 absolute md:static z-20 left-1/2 -translate-x-1/2 md:translate-x-0 mt-12 md:mt-0 shadow-xl backdrop-blur-md">
+                <span className="text-xs text-red-400 px-2 font-bold whitespace-nowrap">Delete room?</span>
+                <button className="px-3 py-1 bg-red-500 hover:bg-red-600 text-white rounded-full text-xs font-bold transition-colors" onClick={handleDelete}>
+                  Yes
+                </button>
+                <button className="px-3 py-1 bg-white/10 hover:bg-white/20 text-white rounded-full text-xs font-bold transition-colors" onClick={() => setConfirmDelete(false)}>
+                  No
+                </button>
+              </div>
+            )}
+            <button 
+              className="p-2 text-white/50 hover:text-white hover:bg-white/5 rounded-full transition-colors" 
+              onClick={handleLeave}
+              title="Leave Room"
+            >
+              <LogOut size={18} />
             </button>
           </div>
-        )}
-        <button 
-          className="p-3 text-white/50 hover:text-white hover:bg-white/5 rounded-full transition-colors" 
-          onClick={handleLeave}
-          title="Leave Room"
-        >
-          <LogOut size={22} />
-        </button>
+        </div>
       </div>
     </div>
   );
