@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Music } from 'lucide-react';
 import api from '../api/axios';
 import useAuthStore from '../stores/authStore';
 import { disconnectSocket } from '../socket/socket';
@@ -52,6 +53,7 @@ export default function LobbyPage() {
   const [rooms, setRooms] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [recentTracks, setRecentTracks] = useState([]);
 
   // Create room modal
   const [showCreate, setShowCreate] = useState(false);
@@ -78,6 +80,10 @@ export default function LobbyPage() {
 
   useEffect(() => {
     fetchRooms();
+    // Fetch recently played
+    api.get('/users/recently-played').then(({ data }) => {
+      setRecentTracks(data.tracks || []);
+    }).catch(() => {});
   }, []);
 
   async function handleCreate(e) {
@@ -153,6 +159,39 @@ export default function LobbyPage() {
         </form>
         {joinError && <span className="text-red-500 self-center text-sm">{joinError}</span>}
       </div>
+
+      {/* Recently Played */}
+      {recentTracks.length > 0 && (
+        <div className="mb-8">
+          <h2 className="mb-4 text-base font-semibold text-gray-400 uppercase tracking-wider">
+            Recently Played
+          </h2>
+          <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4 md:mx-0 md:px-0 scrollbar-hide">
+            {recentTracks.slice(0, 10).map((track) => (
+              <div
+                key={track._id}
+                className="flex-shrink-0 w-36 md:w-44 p-3 bg-white/[0.03] border border-white/5 rounded-2xl hover:bg-white/[0.06] transition-all cursor-pointer group"
+                onClick={() => navigate(track.fromRoom ? `/room/${track.fromRoom._id}` : '/')}
+              >
+                <div className="w-full aspect-square bg-zinc-800 rounded-lg mb-2 overflow-hidden shadow-lg">
+                  {track.albumArtUrl ? (
+                    <img src={track.albumArtUrl} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <Music size={28} className="text-gray-600" />
+                    </div>
+                  )}
+                </div>
+                <div className="font-bold text-sm text-white truncate group-hover:text-primary transition-colors">{track.title}</div>
+                {track.artist && <div className="text-xs text-gray-400 truncate mt-0.5">{track.artist}</div>}
+                {track.fromRoom && (
+                  <div className="text-[10px] text-gray-500 mt-1 truncate">from {track.fromRoom.name}</div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {privateRooms.length > 0 && (
         <>

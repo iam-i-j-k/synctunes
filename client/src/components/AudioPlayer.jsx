@@ -70,6 +70,7 @@ export default function AudioPlayer() {
   const [isMobileExpanded, setIsMobileExpanded] = useState(false);
   const [contextMenu, setContextMenu] = useState(null);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showQueue, setShowQueue] = useState(false);
 
   const openMobilePlayer = () => {
     if (!isMobileExpanded) {
@@ -583,6 +584,14 @@ export default function AudioPlayer() {
 
       {/* RIGHT: Volume Controls */}
       <div className="flex-1 hidden md:flex justify-end items-center gap-4 min-w-[200px]">
+        <button 
+          className={`transition-colors ${showQueue ? 'text-primary' : 'text-gray-400 hover:text-white'}`}
+          onClick={() => setShowQueue(!showQueue)} 
+          aria-label="Queue"
+          title="Queue"
+        >
+          <ListMusic size={16} />
+        </button>
         <button className="text-gray-400 hover:text-white transition-colors" onClick={toggleFullscreen} aria-label="Toggle Fullscreen">
           {isFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
         </button>
@@ -617,6 +626,64 @@ export default function AudioPlayer() {
         </div>
       </div>
     </div>
+
+    {/* QUEUE PANEL (Desktop) */}
+    {showQueue && (
+      <div className="hidden md:block fixed bottom-[90px] right-4 w-[360px] max-h-[60vh] bg-zinc-900 border border-white/10 rounded-2xl shadow-2xl z-[60] overflow-hidden">
+        <div className="px-4 py-3 border-b border-white/5 flex items-center justify-between">
+          <span className="text-sm font-bold text-white">Queue</span>
+          <span className="text-xs text-gray-500">{tracks.length} tracks</span>
+        </div>
+        <div className="overflow-y-auto max-h-[calc(60vh-48px)]">
+          {tracks.length === 0 ? (
+            <div className="py-8 text-center text-gray-400">
+              <Music size={28} className="mx-auto mb-2 opacity-40" />
+              <p className="text-sm">Queue is empty</p>
+            </div>
+          ) : (
+            <div className="flex flex-col">
+              {tracks.map((track, i) => {
+                const isActive = track._id === currentTrackId;
+                return (
+                  <button
+                    key={track._id}
+                    className={`flex items-center gap-3 px-4 py-2.5 text-left transition-colors ${isActive ? 'bg-primary/10 border-l-2 border-primary' : 'hover:bg-white/5 border-l-2 border-transparent'}`}
+                    onClick={() => {
+                      socket.emit('playback:trackChange', { roomId: currentRoom?._id, trackId: track._id, actionSequence });
+                    }}
+                  >
+                    <div className="w-6 text-right text-xs text-gray-500 flex-shrink-0">
+                      {isActive ? (
+                        <div className="flex items-center justify-center gap-[2px]">
+                          <div className="w-[3px] h-3 bg-primary rounded-full animate-pulse" />
+                          <div className="w-[3px] h-4 bg-primary rounded-full animate-pulse" style={{ animationDelay: '0.15s' }} />
+                          <div className="w-[3px] h-2 bg-primary rounded-full animate-pulse" style={{ animationDelay: '0.3s' }} />
+                        </div>
+                      ) : (
+                        i + 1
+                      )}
+                    </div>
+                    <div className="w-9 h-9 rounded-md bg-zinc-800 flex-shrink-0 overflow-hidden">
+                      {track.albumArtUrl ? (
+                        <img src={track.albumArtUrl} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <Music size={14} className="text-gray-500" />
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className={`text-sm font-semibold truncate ${isActive ? 'text-primary' : 'text-white'}`}>{track.title}</div>
+                      {track.artist && <div className="text-[11px] text-gray-400 truncate">{track.artist}</div>}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+    )}
 
     {/* FULL-SCREEN MOBILE PLAYER */}
         <div 

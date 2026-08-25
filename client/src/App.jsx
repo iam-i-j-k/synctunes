@@ -9,6 +9,7 @@ import RegisterPage from './pages/RegisterPage';
 import LobbyPage from './pages/LobbyPage';
 import RoomPage from './pages/RoomPage';
 import LibraryPage from './pages/LibraryPage';
+import ProfilePage from './pages/ProfilePage';
 import Layout from './components/Layout';
 import ConnectionBanner from './components/ConnectionBanner';
 
@@ -49,6 +50,7 @@ export default function App() {
           <Route path="/" element={<LobbyPage />} />
           <Route path="/room/:id" element={<RoomPage />} />
           <Route path="/library/:tab" element={<LibraryPage />} />
+          <Route path="/profile" element={<ProfilePage />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

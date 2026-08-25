@@ -13,6 +13,8 @@ const roomRoutes = require('./routes/rooms');
 const trackRoutes = require('./routes/tracks');
 const userRoutes = require('./routes/users');
 const playlistRoutes = require('./routes/playlists');
+const searchRoutes = require('./routes/search');
+const notificationRoutes = require('./routes/notifications');
 
 const app = express();
 const server = http.createServer(app);
@@ -31,6 +33,8 @@ app.use('/api/rooms', roomRoutes);
 app.use('/api', trackRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/playlists', playlistRoutes);
+app.use('/api/search', searchRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 app.get('/api/health', (_req, res) => res.json({ status: 'ok' }));
 

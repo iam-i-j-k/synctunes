@@ -1,5 +1,6 @@
 const Room = require('../models/Room');
 const User = require('../models/User');
+const { createNotification } = require('../controllers/notificationController');
 
 const MAX_MEMBERS = 20;
 
@@ -36,6 +37,19 @@ function registerRoomHandlers(io, socket, roomCache) {
           { $addToSet: { memberIds: userId } },
           { new: true }
         ).populate('memberIds', 'username');
+
+        // Notify the host that someone joined
+        const joiningUser = await User.findById(userId).select('username');
+        if (joiningUser && room.hostId.toString() !== userId) {
+          createNotification(
+            io,
+            room.hostId.toString(),
+            'ROOM_JOIN',
+            'New member joined',
+            `${joiningUser.username} joined your room "${room.name}"`,
+            { roomId: room._id, fromUserId: userId, fromUsername: joiningUser.username }
+          );
+        }
       }
 
       // Join the socket.io room channel
