@@ -2,6 +2,7 @@ const User = require('../models/User');
 const Track = require('../models/Track');
 const Room = require('../models/Room');
 const Playlist = require('../models/Playlist');
+const PlayHistory = require('../models/PlayHistory');
 
 async function toggleLikeTrack(req, res) {
   try {
@@ -89,36 +90,42 @@ async function getProfile(req, res) {
 async function getRecentlyPlayed(req, res) {
   try {
     const userId = req.user.userId;
-    // Find rooms user is a member of, get their recent tracks
-    const rooms = await Room.find({ memberIds: userId })
-      .select('trackIds currentTrackId name')
+
+    // Fetch the 50 most recent play history records for the user
+    const historyRecords = await PlayHistory.find({ userId })
+      .sort({ playedAt: -1 })
+      .limit(50)
       .populate({
-        path: 'trackIds',
+        path: 'trackId',
         populate: { path: 'mediaAssetId' },
-        options: { sort: { updatedAt: -1 } },
       })
-      .sort({ updatedAt: -1 })
-      .limit(5)
+      .populate('roomId', 'name')
       .lean();
 
-    // Collect unique tracks across rooms, most recent first
-    const seen = new Set();
+    // Deduplicate tracks, keeping only the most recent play for each track
+    const seenTracks = new Set();
     const recentTracks = [];
-    for (const room of rooms) {
-      for (const track of (room.trackIds || []).reverse()) {
-        if (!track || seen.has(track._id.toString())) continue;
-        seen.add(track._id.toString());
-        // Flatten mediaAsset
-        if (track.mediaAssetId && typeof track.mediaAssetId === 'object') {
-          track.cloudinaryUrl = track.mediaAssetId.cloudinaryUrl;
-          track.cloudinaryPublicId = track.mediaAssetId.cloudinaryPublicId;
-          track.durationMs = track.mediaAssetId.durationMs;
-        }
-        track.fromRoom = { _id: room._id, name: room.name };
-        recentTracks.push(track);
-        if (recentTracks.length >= 20) break;
+
+    for (const record of historyRecords) {
+      const track = record.trackId;
+      if (!track || seenTracks.has(track._id.toString())) continue;
+      
+      seenTracks.add(track._id.toString());
+      
+      // Flatten mediaAsset
+      if (track.mediaAssetId && typeof track.mediaAssetId === 'object') {
+        track.cloudinaryUrl = track.mediaAssetId.cloudinaryUrl;
+        track.cloudinaryPublicId = track.mediaAssetId.cloudinaryPublicId;
+        track.durationMs = track.mediaAssetId.durationMs;
       }
-      if (recentTracks.length >= 20) break;
+      
+      // Attach the room info from the history record
+      if (record.roomId) {
+        track.fromRoom = record.roomId;
+      }
+      
+      recentTracks.push(track);
+      if (recentTracks.length >= 20) break; // Limit to 20 unique tracks
     }
 
     return res.json({ tracks: recentTracks });
@@ -128,5 +135,27 @@ async function getRecentlyPlayed(req, res) {
   }
 }
 
-module.exports = { toggleLikeTrack, getLikedTracks, getProfile, getRecentlyPlayed };
+async function recordPlayHistory(req, res) {
+  try {
+    const userId = req.user.userId;
+    const { trackId, roomId } = req.body;
+
+    if (!trackId) {
+      return res.status(400).json({ message: 'trackId is required' });
+    }
+
+    await PlayHistory.create({
+      userId,
+      trackId,
+      roomId: roomId || undefined,
+    });
+
+    return res.json({ message: 'Play recorded' });
+  } catch (err) {
+    console.error('recordPlayHistory error:', err);
+    return res.status(500).json({ message: 'Server error' });
+  }
+}
+
+module.exports = { toggleLikeTrack, getLikedTracks, getProfile, getRecentlyPlayed, recordPlayHistory };
 

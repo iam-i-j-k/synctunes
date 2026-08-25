@@ -132,6 +132,19 @@ export default function AudioPlayer() {
   const { user, updateUser } = useAuthStore();
   const roomId = currentRoom?._id;
 
+  // Track playback history
+  useEffect(() => {
+    if (!currentTrackId || !playbackState.isPlaying) return;
+
+    const timer = setTimeout(() => {
+      api.post('/users/recently-played', { trackId: currentTrackId, roomId }).catch((err) => {
+        console.error('Failed to record play history:', err);
+      });
+    }, 10000); // 10 seconds threshold
+
+    return () => clearTimeout(timer);
+  }, [currentTrackId, playbackState.isPlaying, roomId]);
+
   useDriftCorrection(audioRef, roomId);
 
   useEffect(() => {
