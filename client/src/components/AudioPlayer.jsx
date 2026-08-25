@@ -80,11 +80,11 @@ export default function AudioPlayer() {
     if (isMobileExpanded) {
       // Small timeout to allow the DOM to render the full text before measuring
       setTimeout(() => {
-        if (titleRef.current) {
-          setTitleMarquee(titleRef.current.scrollWidth > titleRef.current.clientWidth);
+        if (titleRef.current && titleRef.current.parentElement) {
+          setTitleMarquee(titleRef.current.scrollWidth > titleRef.current.parentElement.clientWidth);
         }
-        if (artistRef.current) {
-          setArtistMarquee(artistRef.current.scrollWidth > artistRef.current.clientWidth);
+        if (artistRef.current && artistRef.current.parentElement) {
+          setArtistMarquee(artistRef.current.scrollWidth > artistRef.current.parentElement.clientWidth);
         }
       }, 100);
     } else {
@@ -594,12 +594,11 @@ export default function AudioPlayer() {
     </div>
 
     {/* FULL-SCREEN MOBILE PLAYER */}
-      {isMobileExpanded && (
         <div 
-          className="md:hidden fixed inset-0 z-[100] flex flex-col animate-fade-in pointer-events-auto font-sans"
+          className={`md:hidden fixed inset-0 z-[100] flex flex-col font-sans transition-all duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] ${isMobileExpanded ? 'translate-y-0 opacity-100 pointer-events-auto' : 'translate-y-full opacity-0 pointer-events-none'}`}
           style={{ background: stringToDarkGradient(currentTrack.title) }}
         >
-          <div className="relative z-10 flex flex-col h-full pt-12 pb-8 px-6">
+          <div className="relative z-10 flex flex-col h-full pt-6 pb-8 px-6">
             {/* Top Bar */}
             <div className="flex justify-between items-center mb-4">
               <button onClick={() => setIsMobileExpanded(false)} className="text-white p-2 -ml-2">
@@ -638,13 +637,13 @@ export default function AudioPlayer() {
                   <div className="flex flex-col min-w-0 flex-1 overflow-hidden mask-edges relative">
                     <div 
                       ref={titleRef}
-                      className={`text-[22px] font-bold text-white tracking-tight leading-tight whitespace-nowrap w-fit ${titleMarquee ? 'animate-[marquee_8s_linear_infinite]' : 'truncate'}`}
+                      className={`text-[22px] font-bold text-white tracking-tight leading-tight whitespace-nowrap ${titleMarquee ? 'w-max animate-[marquee_8s_linear_infinite]' : 'truncate'}`}
                     >
                       {currentTrack.title} {titleMarquee && <span className="ml-8">{currentTrack.title}</span>}
                     </div>
                     <div 
                       ref={artistRef}
-                      className={`text-gray-300 text-[15px] mt-0.5 whitespace-nowrap w-fit ${artistMarquee ? 'animate-[marquee_8s_linear_infinite]' : 'truncate'}`}
+                      className={`text-gray-300 text-[15px] mt-0.5 whitespace-nowrap ${artistMarquee ? 'w-max animate-[marquee_8s_linear_infinite]' : 'truncate'}`}
                     >
                       {currentTrack.artist || 'SyncTunes Room'} {artistMarquee && <span className="ml-8">{currentTrack.artist || 'SyncTunes Room'}</span>}
                     </div>
@@ -750,7 +749,6 @@ export default function AudioPlayer() {
             </div>
           </div>
         </div>
-      )}
 
       {contextMenu && (
         <ContextMenu 
