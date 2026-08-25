@@ -21,7 +21,7 @@ function registerRoomHandlers(io, socket, roomCache) {
   // room:join
   socket.on('room:join', async ({ roomId }) => {
     try {
-      let room = await Room.findById(roomId).populate('memberIds', 'username');
+      let room = await Room.findById(roomId).populate('memberIds', 'username').populate('hostId', 'username');
       if (!room) {
         return socket.emit('room:joinError', { reason: 'NOT_FOUND' });
       }
@@ -36,14 +36,14 @@ function registerRoomHandlers(io, socket, roomCache) {
           roomId,
           { $addToSet: { memberIds: userId } },
           { new: true }
-        ).populate('memberIds', 'username');
+        ).populate('memberIds', 'username').populate('hostId', 'username');
 
         // Notify the host that someone joined
         const joiningUser = await User.findById(userId).select('username');
-        if (joiningUser && room.hostId.toString() !== userId) {
+        if (joiningUser && room.hostId._id.toString() !== userId) {
           createNotification(
             io,
-            room.hostId.toString(),
+            room.hostId._id.toString(),
             'ROOM_JOIN',
             'New member joined',
             `${joiningUser.username} joined your room "${room.name}"`,
