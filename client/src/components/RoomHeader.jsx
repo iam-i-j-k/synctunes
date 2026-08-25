@@ -7,6 +7,18 @@ import useAuthStore from '../stores/authStore';
 import useRoomStore from '../stores/roomStore';
 import { toast } from 'react-hot-toast';
 
+function formatDurationMs(ms) {
+  if (!ms) return '0 min';
+  const totalSeconds = Math.floor(ms / 1000);
+  const hours = Math.floor(totalSeconds / 3600);
+  const mins = Math.floor((totalSeconds % 3600) / 60);
+  const secs = totalSeconds % 60;
+  
+  if (hours > 0) return `${hours} hr ${mins} min`;
+  if (mins > 0) return `${mins} min ${secs} sec`;
+  return `${secs} sec`;
+}
+
 function stringToGradient(str = '') {
   let hash = 0;
   for (let i = 0; i < str.length; i++) {
@@ -147,11 +159,23 @@ export default function RoomHeader() {
           </div>
         )}
 
-        <div className="flex items-center gap-4 mt-2">
+        <div className="flex flex-wrap items-center gap-3 mt-2">
           <div className="flex items-center text-sm font-medium text-gray-300">
              Host: {isHost ? 'You' : 'Member'}
           </div>
-          <span className="text-white/20">•</span>
+          <span className="text-white/20 hidden md:inline">•</span>
+          <div className="flex items-center text-sm font-medium text-gray-300">
+             {tracks?.length || 0} track{(tracks?.length === 1) ? '' : 's'}
+          </div>
+          {tracks?.length > 0 && (
+            <>
+              <span className="text-white/20 hidden md:inline">•</span>
+              <div className="flex items-center text-sm font-medium text-gray-300">
+                 {formatDurationMs(tracks.reduce((acc, t) => acc + (t.durationMs || 0), 0))}
+              </div>
+            </>
+          )}
+          <span className="text-white/20 hidden md:inline">•</span>
           <button
             className="flex items-center gap-2 px-3 py-1.5 bg-white/10 hover:bg-white/20 rounded-full text-xs font-bold text-white transition-colors"
             onClick={copyCode}
