@@ -71,6 +71,31 @@ export default function AudioPlayer() {
   const [contextMenu, setContextMenu] = useState(null);
   const [showAddModal, setShowAddModal] = useState(false);
 
+  const openMobilePlayer = () => {
+    if (!isMobileExpanded) {
+      window.history.pushState({ player: 'open' }, '');
+      setIsMobileExpanded(true);
+    }
+  };
+
+  const closeMobilePlayer = () => {
+    if (isMobileExpanded) {
+      if (window.history.state?.player === 'open') {
+        window.history.back();
+      } else {
+        setIsMobileExpanded(false);
+      }
+    }
+  };
+
+  useEffect(() => {
+    const handlePopState = () => {
+      setIsMobileExpanded(false);
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
   const titleRef = useRef(null);
   const artistRef = useRef(null);
   const [titleMarquee, setTitleMarquee] = useState(false);
@@ -428,7 +453,7 @@ export default function AudioPlayer() {
             return;
           }
           if (window.innerWidth < 768) {
-            setIsMobileExpanded(true);
+            openMobilePlayer();
           }
         }}
       >
@@ -601,7 +626,7 @@ export default function AudioPlayer() {
           <div className="relative z-10 flex flex-col h-full pt-6 pb-8 px-6">
             {/* Top Bar */}
             <div className="flex justify-between items-center mb-4">
-              <button onClick={() => setIsMobileExpanded(false)} className="text-white p-2 -ml-2">
+              <button onClick={closeMobilePlayer} className="text-white p-2 -ml-2">
                 <ChevronDown size={28} />
               </button>
               <div className="flex flex-col items-center justify-center">
@@ -740,7 +765,7 @@ export default function AudioPlayer() {
                   >
                     <Share2 size={22} />
                   </button>
-                  <button onClick={() => setIsMobileExpanded(false)} className="text-white/70 hover:text-white transition-colors p-2 -mr-2 relative" title="Queue">
+                  <button onClick={closeMobilePlayer} className="text-white/70 hover:text-white transition-colors p-2 -mr-2 relative" title="Queue">
                     <ListMusic size={24} />
                   </button>
                 </div>
