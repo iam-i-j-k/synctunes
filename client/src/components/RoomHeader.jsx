@@ -166,15 +166,6 @@ export default function RoomHeader() {
                 <Edit2 size={24} />
               </button>
             )}
-            {isHost && (
-              <button
-                className={`p-2 transition-colors opacity-100 ${currentRoom.isPrivate ? 'text-red-400 hover:text-red-300' : 'text-green-400 hover:text-green-300'}`}
-                onClick={togglePrivacy}
-                title={currentRoom.isPrivate ? "Room is Private (Click to make Public)" : "Room is Public (Click to make Private)"}
-              >
-                {currentRoom.isPrivate ? <Lock size={24} /> : <Globe size={24} />}
-              </button>
-            )}
           </div>
         )}
 
@@ -203,6 +194,31 @@ export default function RoomHeader() {
             {copied ? <Check size={14} className="text-primary" /> : <Copy size={14} />}
             {copied ? 'COPIED!' : `ID: ${currentRoom.joinCode}`}
           </button>
+          {isHost ? (
+            <button
+              onClick={togglePrivacy}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all transform hover:scale-105 ${
+                currentRoom.isPrivate 
+                  ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30 border border-red-500/30' 
+                  : 'bg-green-500/20 text-green-400 hover:bg-green-500/30 border border-green-500/30'
+              }`}
+              title="Click to toggle privacy"
+            >
+              {currentRoom.isPrivate ? <Lock size={14} /> : <Globe size={14} />}
+              {currentRoom.isPrivate ? 'PRIVATE' : 'PUBLIC'}
+            </button>
+          ) : (
+            <div
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold ${
+                currentRoom.isPrivate 
+                  ? 'bg-red-500/10 text-red-400/80 border border-red-500/20' 
+                  : 'bg-green-500/10 text-green-400/80 border border-green-500/20'
+              }`}
+            >
+              {currentRoom.isPrivate ? <Lock size={14} /> : <Globe size={14} />}
+              {currentRoom.isPrivate ? 'PRIVATE' : 'PUBLIC'}
+            </div>
+          )}
         </div>
       </div>
 
