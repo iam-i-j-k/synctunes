@@ -29,6 +29,17 @@ function stringToGradient(str = '') {
   return `linear-gradient(135deg, hsl(${h1}, 70%, 50%), hsl(${h2}, 70%, 30%))`;
 }
 
+// Generate a very dark deterministic gradient based on a string for backgrounds
+function stringToDarkGradient(str = '') {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = str.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const h1 = Math.abs(hash % 360);
+  const h2 = Math.abs((hash * 2) % 360);
+  return `linear-gradient(180deg, hsl(${h1}, 30%, 16%), hsl(${h2}, 30%, 8%), #000000)`;
+}
+
 export default function AudioPlayer() {
   const audioRef = useRef(null);
   const seekingRef = useRef(false);
@@ -584,14 +595,10 @@ export default function AudioPlayer() {
 
     {/* FULL-SCREEN MOBILE PLAYER */}
       {isMobileExpanded && (
-        <div className="md:hidden fixed inset-0 z-[100] bg-zinc-950 flex flex-col animate-fade-in pointer-events-auto font-sans">
-          {/* Full Screen Background (Canvas style) */}
-          <div 
-            className="absolute inset-0 z-0 bg-cover bg-center opacity-50"
-            style={currentTrack.albumArtUrl ? { backgroundImage: `url(${currentTrack.albumArtUrl})` } : { background: stringToGradient(currentTrack.title) }}
-          />
-          <div className="absolute inset-0 z-0 bg-gradient-to-t from-zinc-950 via-zinc-950/70 to-transparent pointer-events-none" />
-
+        <div 
+          className="md:hidden fixed inset-0 z-[100] flex flex-col animate-fade-in pointer-events-auto font-sans"
+          style={{ background: stringToDarkGradient(currentTrack.title) }}
+        >
           <div className="relative z-10 flex flex-col h-full pt-12 pb-8 px-6">
             {/* Top Bar */}
             <div className="flex justify-between items-center mb-4">
@@ -613,21 +620,21 @@ export default function AudioPlayer() {
               </button>
             </div>
             
-            {/* Flexible Space (Video/Canvas area) */}
-            <div className="flex-1 min-h-0 w-full" />
+            {/* Flexible Space (Large Album Art) */}
+            <div className="flex-1 min-h-0 w-full flex items-center justify-center py-6">
+              <div 
+                className="w-full aspect-square max-h-[350px] max-w-[350px] rounded-xl shadow-[0_8px_30px_rgba(0,0,0,0.5)] flex items-center justify-center overflow-hidden relative"
+                style={currentTrack.albumArtUrl ? { backgroundImage: `url(${currentTrack.albumArtUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' } : { background: stringToGradient(currentTrack.title) }}
+              >
+                {!currentTrack.albumArtUrl && <Music size={64} className="text-white/30" />}
+              </div>
+            </div>
 
             {/* Bottom Controls Area */}
             <div className="flex flex-col w-full mt-auto">
               {/* Track Info Row */}
               <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center flex-1 min-w-0 pr-4">
-                  {/* Small Album Art */}
-                  <div 
-                    className="w-14 h-14 rounded bg-zinc-800 flex-shrink-0 mr-4 shadow-[0_8px_24px_rgba(0,0,0,0.5)] flex items-center justify-center overflow-hidden"
-                    style={currentTrack.albumArtUrl ? { backgroundImage: `url(${currentTrack.albumArtUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' } : { background: stringToGradient(currentTrack.title) }}
-                  >
-                    {!currentTrack.albumArtUrl && <Music size={24} className="text-white/50" />}
-                  </div>
                   <div className="flex flex-col min-w-0 flex-1 overflow-hidden mask-edges relative">
                     <div 
                       ref={titleRef}

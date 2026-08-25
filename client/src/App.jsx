@@ -10,6 +10,7 @@ import LobbyPage from './pages/LobbyPage';
 import RoomPage from './pages/RoomPage';
 import LibraryPage from './pages/LibraryPage';
 import Layout from './components/Layout';
+import ConnectionBanner from './components/ConnectionBanner';
 
 export default function App() {
   const token = useAuthStore((s) => s.token);
@@ -22,6 +23,7 @@ export default function App() {
 
   return (
     <BrowserRouter>
+      <ConnectionBanner />
       <Toaster 
         position="bottom-right" 
         toastOptions={{ 
