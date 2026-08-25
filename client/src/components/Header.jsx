@@ -111,18 +111,25 @@ export default function Header() {
 
   async function playTrack(track) {
     try {
-      addTrackToStore(track);
-      if (currentRoom) {
-        api.post(`/rooms/${currentRoom._id}/tracks/add-existing`, { trackId: track._id }).catch(console.error);
-        socket.emit('playback:trackChange', { roomId: currentRoom._id, trackId: track._id, actionSequence });
-      } else {
-        const { data: { room } } = await api.post('/rooms', { name: 'My Library', isPrivate: true });
-        api.post(`/rooms/${room._id}/tracks/add-existing`, { trackId: track._id }).catch(console.error);
+      const { data: { room } } = await api.post('/rooms/personal');
+      await api.post(`/rooms/${room._id}/tracks/add-existing`, { trackId: track._id }).catch(console.error);
+      
+      const isRoomPage = window.location.pathname.startsWith('/room/');
+      const isOnPersonalRoomPage = window.location.pathname === `/room/${room._id}`;
+
+      // If they are on a shared room page, navigate them to their personal room
+      if (isRoomPage && !isOnPersonalRoomPage) {
+        navigate(`/room/${room._id}`);
+      } else if (currentRoom?._id !== room._id) {
+        // Otherwise just join the personal room quietly (e.g. from Lobby or Profile)
         socket.emit('room:join', { roomId: room._id });
-        setTimeout(() => {
-          socket.emit('playback:trackChange', { roomId: room._id, trackId: track._id, actionSequence: 0 });
-        }, 50);
       }
+
+      // Small delay to ensure the join goes through before playing
+      setTimeout(() => {
+        socket.emit('playback:trackChange', { roomId: room._id, trackId: track._id, actionSequence: 0 });
+      }, 150);
+
       setShowDropdown(false);
       setQuery('');
     } catch (err) {

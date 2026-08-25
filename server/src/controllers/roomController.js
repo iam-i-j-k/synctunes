@@ -48,6 +48,8 @@ async function listRooms(req, res) {
     const skip = (page - 1) * limit;
 
     const query = {
+      isPersonalLibrary: { $ne: true },
+      name: { $ne: 'My Library' },
       $or: [
         { isPrivate: false },
         { isPrivate: true, memberIds: req.user.userId },
@@ -248,4 +250,37 @@ async function getMemberList(room) {
   }));
 }
 
-module.exports = { createRoom, listRooms, getRoom, updateRoom, deleteRoom, joinRoom, kickMember };
+async function getOrCreatePersonalRoom(req, res) {
+  try {
+    const userId = req.user.userId;
+    let room = await Room.findOne({ hostId: userId, isPersonalLibrary: true });
+
+    if (!room) {
+      // Ensure unique join code for the new personal room
+      let joinCode;
+      let attempts = 0;
+      while (attempts < 5) {
+        joinCode = generateJoinCode();
+        const exists = await Room.findOne({ joinCode });
+        if (!exists) break;
+        attempts++;
+      }
+
+      room = await Room.create({
+        name: 'My Library',
+        hostId: userId,
+        isPrivate: true,
+        isPersonalLibrary: true,
+        joinCode,
+        memberIds: [userId],
+      });
+    }
+
+    return res.json({ room });
+  } catch (err) {
+    console.error('getOrCreatePersonalRoom error:', err);
+    return res.status(500).json({ message: 'Server error' });
+  }
+}
+
+module.exports = { createRoom, listRooms, getRoom, updateRoom, deleteRoom, joinRoom, kickMember, getOrCreatePersonalRoom };

@@ -27,6 +27,10 @@ const roomSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    isPersonalLibrary: {
+      type: Boolean,
+      default: false,
+    },
     joinCode: {
       type: String,
       required: true,
