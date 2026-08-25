@@ -89,31 +89,43 @@ async function getRoom(req, res) {
   }
 }
 
-async function renameRoom(req, res) {
+async function updateRoom(req, res) {
   try {
     const room = await Room.findById(req.params.id);
     if (!room) return res.status(404).json({ message: 'Room not found' });
     if (room.hostId.toString() !== req.user.userId) {
-      return res.status(403).json({ message: 'Only the host can rename the room' });
+      return res.status(403).json({ message: 'Only the host can modify the room' });
     }
 
-    const { name } = req.body;
-    if (!name || name.trim().length === 0 || name.trim().length > 50) {
-      return res.status(400).json({ message: 'Invalid room name' });
+    const { name, isPrivate } = req.body;
+    let modified = false;
+
+    if (name !== undefined) {
+      if (!name || name.trim().length === 0 || name.trim().length > 50) {
+        return res.status(400).json({ message: 'Invalid room name' });
+      }
+      room.name = name.trim();
+      modified = true;
     }
 
-    room.name = name.trim();
-    await room.save();
-
-    // Notify via socket if io is accessible (injected via app.locals)
-    const io = req.app.locals.io;
-    if (io) {
-      io.to(`room:${room._id}`).emit('room:updated', { name: room.name });
+    if (isPrivate !== undefined) {
+      room.isPrivate = Boolean(isPrivate);
+      modified = true;
     }
 
-    return res.json({ room });
+    if (modified) {
+      await room.save();
+      // Notify via socket if io is accessible (injected via app.locals)
+      const io = req.app.locals.io;
+      if (io) {
+        io.to(`room:${room._id}`).emit('room:updated', { name: room.name, isPrivate: room.isPrivate });
+      }
+    }
+
+    const populated = await Room.findById(room._id).populate('hostId', 'username').populate('memberIds', 'username');
+    return res.json({ room: populated });
   } catch (err) {
-    console.error('renameRoom error:', err);
+    console.error('updateRoom error:', err);
     return res.status(500).json({ message: 'Server error' });
   }
 }
@@ -236,4 +248,4 @@ async function getMemberList(room) {
   }));
 }
 
-module.exports = { createRoom, listRooms, getRoom, renameRoom, deleteRoom, joinRoom, kickMember };
+module.exports = { createRoom, listRooms, getRoom, updateRoom, deleteRoom, joinRoom, kickMember };

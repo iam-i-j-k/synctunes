@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Edit2, Copy, Trash2, LogOut, Check } from 'lucide-react';
+import { Edit2, Copy, Trash2, LogOut, Check, Lock, Globe } from 'lucide-react';
 import api from '../api/axios';
 import socket from '../socket/socket';
 import useAuthStore from '../stores/authStore';
@@ -59,6 +59,16 @@ export default function RoomHeader() {
     } catch (err) {
       setRenameError(err.response?.data?.message || 'Rename failed');
       toast.error('Failed to rename room');
+    }
+  }
+
+  async function togglePrivacy() {
+    try {
+      const { data } = await api.patch(`/rooms/${currentRoom._id}`, { isPrivate: !currentRoom.isPrivate });
+      setRoom(data.room);
+      toast.success(`Room is now ${data.room.isPrivate ? 'Private' : 'Public'}`);
+    } catch (err) {
+      toast.error('Failed to update room privacy');
     }
   }
 
@@ -154,6 +164,15 @@ export default function RoomHeader() {
                 title="Rename room"
               >
                 <Edit2 size={24} />
+              </button>
+            )}
+            {isHost && (
+              <button
+                className={`p-2 transition-colors opacity-100 ${currentRoom.isPrivate ? 'text-red-400 hover:text-red-300' : 'text-green-400 hover:text-green-300'}`}
+                onClick={togglePrivacy}
+                title={currentRoom.isPrivate ? "Room is Private (Click to make Public)" : "Room is Public (Click to make Private)"}
+              >
+                {currentRoom.isPrivate ? <Lock size={24} /> : <Globe size={24} />}
               </button>
             )}
           </div>

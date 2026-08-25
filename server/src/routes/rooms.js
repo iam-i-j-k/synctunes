@@ -4,7 +4,7 @@ const {
   createRoom,
   listRooms,
   getRoom,
-  renameRoom,
+  updateRoom,
   deleteRoom,
   joinRoom,
   kickMember,
@@ -18,7 +18,7 @@ router.get('/', listRooms);
 router.post('/', createRoom);
 router.post('/join', joinRoom);
 router.get('/:id', getRoom);
-router.patch('/:id', renameRoom);
+router.patch('/:id', updateRoom);
 router.delete('/:id', deleteRoom);
 router.post('/:id/kick', kickMember);
 
