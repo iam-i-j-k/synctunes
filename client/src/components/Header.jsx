@@ -295,7 +295,7 @@ export default function Header() {
 
           {/* Notification Dropdown */}
           {showNotifications && (
-            <div className="absolute top-full right-0 mt-2 w-80 bg-zinc-900 border border-white/10 rounded-2xl shadow-2xl overflow-hidden z-50 max-h-[60vh] overflow-y-auto">
+            <div className="fixed sm:absolute top-16 sm:top-full left-4 right-4 sm:left-auto sm:right-0 sm:mt-2 sm:w-80 bg-zinc-900 border border-white/10 rounded-2xl shadow-2xl overflow-hidden z-50 max-h-[60vh] overflow-y-auto origin-top-right animate-in fade-in zoom-in-95">
               <div className="px-4 py-3 border-b border-white/5 flex items-center justify-between">
                 <span className="text-sm font-bold text-white">Notifications</span>
                 {notifications.length > 0 && (
