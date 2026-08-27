@@ -28,7 +28,7 @@ function stringToGradient(str = '') {
   const h2 = Math.abs((hash * 2) % 360);
   return {
     iconBg: `linear-gradient(135deg, hsl(${h1}, 70%, 50%), hsl(${h2}, 70%, 30%))`,
-    headerBg: `linear-gradient(to bottom, hsl(${h1}, 50%, 15%), #09090b)`
+    headerBg: `linear-gradient(to bottom, hsl(${h1}, 40%, 25%), #09090b)`
   };
 }
 
@@ -125,133 +125,144 @@ export default function RoomHeader() {
 
   return (
     <div 
-      className="flex flex-col md:flex-row items-center md:items-end gap-6 p-6 md:p-8 border-b border-white/5 relative z-10 transition-colors duration-700"
+      className="relative w-full flex-shrink-0 transition-colors duration-1000"
       style={{ background: colors.headerBg }}
     >
-      <div 
-        className="w-32 h-32 md:w-48 md:h-48 rounded-xl shadow-2xl flex items-center justify-center flex-shrink-0 overflow-hidden"
-        style={covers.length === 0 ? { background: colors.iconBg } : { backgroundColor: '#27272a' }}
-      >
-         {coverContent}
-      </div>
-      
-      <div className="flex flex-col items-center md:items-start gap-2 flex-1 w-full text-center md:text-left">
-        <span className="text-xs font-bold uppercase tracking-widest text-white/80">Room Session</span>
-        
-        {renaming ? (
-          <form onSubmit={handleRename} className="flex flex-wrap items-center gap-3 justify-center md:justify-start">
-            <input
-              value={newName}
-              onChange={(e) => { setNewName(e.target.value); setRenameError(''); }}
-              className="px-4 py-2 bg-black/20 border border-white/20 rounded-lg text-white font-bold text-xl md:text-3xl focus:outline-none focus:border-primary/50"
-              autoFocus
-            />
-            <button type="submit" className="px-4 py-2 bg-primary text-black font-bold rounded-lg text-sm transition-all hover:scale-105">
-              Save
-            </button>
-            <button type="button" className="px-4 py-2 bg-white/10 text-white font-bold rounded-lg text-sm transition-all hover:bg-white/20" onClick={() => setRenaming(false)}>
-              Cancel
-            </button>
-            {renameError && <span className="text-red-500 text-sm font-medium w-full mt-2">{renameError}</span>}
-          </form>
-        ) : (
-          <div className="flex items-center justify-center md:justify-start gap-2 group w-full px-4 md:px-0">
-            <h1 className="text-4xl md:text-7xl font-extrabold text-white tracking-tighter line-clamp-2 break-words text-center md:text-left">
-              {currentRoom.name}
-            </h1>
-            {isHost && (
-              <button
-                className="p-2 text-white/30 hover:text-white transition-colors opacity-100 flex-shrink-0"
-                onClick={() => { setNewName(currentRoom.name); setRenaming(true); }}
-                title="Rename room"
-              >
-                <Edit2 size={24} />
-              </button>
-            )}
-          </div>
-        )}
+      <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-transparent to-transparent opacity-90" />
+      <div className="absolute inset-0 bg-black/10" />
 
-        <div className="flex flex-wrap items-center justify-center md:justify-start gap-3 mt-2">
-          <div className="flex items-center text-sm font-medium text-gray-300">
-             Host: {isHost ? 'You' : (currentRoom.hostId?.username || 'Unknown')}
-          </div>
-          <span className="text-white/20 hidden md:inline">•</span>
-          <div className="flex items-center text-sm font-medium text-gray-300">
-             {tracks?.length || 0} track{(tracks?.length === 1) ? '' : 's'}
-          </div>
-          {tracks?.length > 0 && (
-            <>
-              <span className="text-white/20 hidden md:inline">•</span>
-              <div className="flex items-center text-sm font-medium text-gray-300">
-                 {formatDurationMs(tracks.reduce((acc, t) => acc + (t.durationMs || 0), 0))}
+      <div className="relative flex flex-col md:flex-row items-center md:items-end gap-6 p-6 md:p-8">
+        <div className="w-48 h-48 md:w-56 md:h-56 shadow-2xl rounded-xl overflow-hidden flex-shrink-0 ring-1 ring-white/10 group"
+          style={covers.length === 0 ? { background: colors.iconBg } : { backgroundColor: '#27272a' }}
+        >
+           {coverContent}
+        </div>
+        
+        <div className="flex flex-col items-center md:items-start gap-1 flex-1 w-full text-center md:text-left">
+          <span className="text-xs font-bold uppercase tracking-widest text-white/80">Room Session</span>
+          
+          {renaming ? (
+            <form onSubmit={handleRename} className="mb-4">
+              <input
+                type="text"
+                className="bg-white/10 backdrop-blur-md border border-white/20 text-4xl md:text-6xl font-black tracking-tighter text-white px-2 py-1 rounded focus:outline-none focus:ring-2 focus:ring-primary/50 w-full"
+                value={newName}
+                onChange={e => setNewName(e.target.value)}
+                autoFocus
+              />
+              {renameError && <p className="text-red-400 text-sm mt-1">{renameError}</p>}
+              <div className="flex gap-2 mt-2">
+                <button type="submit" className="px-4 py-1.5 bg-primary text-black font-semibold rounded-full hover:scale-105 transition-transform text-sm">Save</button>
+                <button type="button" onClick={() => setRenaming(false)} className="px-4 py-1.5 bg-white/10 hover:bg-white/20 text-white font-semibold rounded-full transition-colors text-sm">Cancel</button>
               </div>
-            </>
-          )}
-          
-          <div className="w-full h-0 md:hidden" /> {/* Force break on mobile for buttons */}
-          
-          <button
-            className="flex items-center gap-2 px-3 py-1.5 bg-white/10 hover:bg-white/20 rounded-full text-xs font-bold text-white transition-colors"
-            onClick={copyCode}
-            title="Copy join code"
-          >
-            {copied ? <Check size={14} className="text-primary" /> : <Copy size={14} />}
-            {copied ? 'COPIED!' : `ID: ${currentRoom.joinCode}`}
-          </button>
-          {isHost ? (
-            <button
-              onClick={togglePrivacy}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all transform hover:scale-105 ${
-                currentRoom.isPrivate 
-                  ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30 border border-red-500/30' 
-                  : 'bg-green-500/20 text-green-400 hover:bg-green-500/30 border border-green-500/30'
-              }`}
-              title="Click to toggle privacy"
-            >
-              {currentRoom.isPrivate ? <Lock size={14} /> : <Globe size={14} />}
-              {currentRoom.isPrivate ? 'PRIVATE' : 'PUBLIC'}
-            </button>
+            </form>
           ) : (
-            <div
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold ${
-                currentRoom.isPrivate 
-                  ? 'bg-red-500/10 text-red-400/80 border border-red-500/20' 
-                  : 'bg-green-500/10 text-green-400/80 border border-green-500/20'
-              }`}
-            >
-              {currentRoom.isPrivate ? <Lock size={14} /> : <Globe size={14} />}
-              {currentRoom.isPrivate ? 'PRIVATE' : 'PUBLIC'}
+            <div className="flex items-center gap-4 group/title mb-4">
+              <h1 className="text-4xl md:text-7xl font-black tracking-tighter text-white line-clamp-2 drop-shadow-md">
+                {currentRoom.name}
+              </h1>
+              {isHost && (
+                <button 
+                  onClick={() => {
+                    setNewName(currentRoom.name);
+                    setRenaming(true);
+                    setRenameError('');
+                  }}
+                  className="p-2.5 rounded-full hover:bg-white/10 text-gray-400 hover:text-white transition-colors opacity-0 group-hover/title:opacity-100"
+                  title="Rename Room"
+                >
+                  <Edit2 size={24} />
+                </button>
+              )}
             </div>
           )}
 
-          <div className="flex items-center gap-1 ml-0 md:ml-4 border-l-0 md:border-l md:border-white/10 pl-0 md:pl-4">
-            {isHost && !confirmDelete && (
+          <div className="flex flex-wrap items-center justify-center md:justify-start gap-3">
+            <div className="flex items-center text-sm font-medium text-gray-300">
+               Host: {isHost ? 'You' : (currentRoom.hostId?.username || 'Unknown')}
+            </div>
+            <span className="text-white/20">•</span>
+            <div className="flex items-center text-sm font-medium text-gray-300">
+               {tracks?.length || 0} track{(tracks?.length === 1) ? '' : 's'}
+            </div>
+            {tracks?.length > 0 && (
+              <>
+                <span className="text-white/20">•</span>
+                <div className="flex items-center text-sm font-medium text-gray-300">
+                   {formatDurationMs(tracks.reduce((acc, t) => acc + (t.durationMs || 0), 0))}
+                </div>
+              </>
+            )}
+          </div>          <div className="flex flex-wrap items-center justify-center md:justify-start gap-4 mt-4">
+            <div className="flex items-center gap-3 text-sm font-medium">
               <button 
-                className="p-2 text-white/50 hover:text-red-500 hover:bg-white/5 rounded-full transition-colors" 
-                onClick={() => setConfirmDelete(true)}
-                title="Delete Room"
+                onClick={copyCode}
+                className="flex items-center gap-2 text-gray-300 hover:text-white bg-white/10 backdrop-blur-md px-3 py-1.5 rounded-full transition-colors group/copy border border-white/5"
+                title="Copy Join Code"
               >
-                <Trash2 size={18} />
+                <span className="text-gray-400 group-hover/copy:text-gray-300 transition-colors">ID:</span>
+                <span className="font-mono font-bold tracking-wider">{currentRoom.joinCode}</span>
+                {copied ? <Check size={14} className="text-green-400" /> : <Copy size={14} className="opacity-70 group-hover/copy:opacity-100 transition-opacity" />}
               </button>
-            )}
-            {confirmDelete && (
-              <div className="flex items-center gap-2 bg-red-500/10 rounded-full py-1 px-2 border border-red-500/30 absolute md:static z-20 left-1/2 -translate-x-1/2 md:translate-x-0 mt-12 md:mt-0 shadow-xl backdrop-blur-md">
-                <span className="text-xs text-red-400 px-2 font-bold whitespace-nowrap">Delete room?</span>
-                <button className="px-3 py-1 bg-red-500 hover:bg-red-600 text-white rounded-full text-xs font-bold transition-colors" onClick={handleDelete}>
-                  Yes
+
+              {isHost && (
+                <button
+                  onClick={togglePrivacy}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full backdrop-blur-md transition-colors border border-white/5 ${
+                    currentRoom.isPrivate 
+                      ? 'bg-red-500/20 text-red-300 hover:bg-red-500/30' 
+                      : 'bg-primary/20 text-primary hover:bg-primary/30'
+                  }`}
+                  title={currentRoom.isPrivate ? 'Make Public' : 'Make Private'}
+                >
+                  {currentRoom.isPrivate ? <Lock size={14} /> : <Globe size={14} />}
+                  {currentRoom.isPrivate ? 'PRIVATE' : 'PUBLIC'}
                 </button>
-                <button className="px-3 py-1 bg-white/10 hover:bg-white/20 text-white rounded-full text-xs font-bold transition-colors" onClick={() => setConfirmDelete(false)}>
-                  No
+              )}
+
+              {!isHost && (
+                <div
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-white/5 backdrop-blur-md ${
+                    currentRoom.isPrivate 
+                      ? 'bg-red-500/10 text-red-300/80' 
+                      : 'bg-primary/10 text-primary/80'
+                  }`}
+                >
+                  {currentRoom.isPrivate ? <Lock size={14} /> : <Globe size={14} />}
+                  {currentRoom.isPrivate ? 'PRIVATE' : 'PUBLIC'}
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center gap-1 ml-0 md:ml-2 border-l-0 md:border-l md:border-white/10 pl-0 md:pl-6">
+              {isHost && !confirmDelete && (
+                <button 
+                  className="p-2 text-white/50 hover:text-red-500 hover:bg-white/5 rounded-full transition-colors" 
+                  onClick={() => setConfirmDelete(true)}
+                  title="Delete Room"
+                >
+                  <Trash2 size={18} />
                 </button>
-              </div>
-            )}
-            <button 
-              className="p-2 text-white/50 hover:text-white hover:bg-white/5 rounded-full transition-colors" 
-              onClick={handleLeave}
-              title="Leave Room"
-            >
-              <LogOut size={18} />
-            </button>
+              )}
+              {confirmDelete && (
+                <div className="flex items-center gap-2 bg-red-500/10 rounded-full py-1 px-2 border border-red-500/30 absolute md:static z-20 left-1/2 -translate-x-1/2 md:translate-x-0 mt-12 md:mt-0 shadow-xl backdrop-blur-md">
+                  <span className="text-xs text-red-400 px-2 font-bold whitespace-nowrap">Delete room?</span>
+                  <button className="px-3 py-1 bg-red-500 hover:bg-red-600 text-white rounded-full text-xs font-bold transition-colors" onClick={handleDelete}>
+                    Yes
+                  </button>
+                  <button className="px-3 py-1 bg-white/10 hover:bg-white/20 text-white rounded-full text-xs font-bold transition-colors" onClick={() => setConfirmDelete(false)}>
+                    No
+                  </button>
+                </div>
+              )}
+              <button 
+                className="p-2 text-white/50 hover:text-white hover:bg-white/5 rounded-full transition-colors" 
+                onClick={handleLeave}
+                title="Leave Room"
+              >
+                <LogOut size={18} />
+              </button>
+            </div>
           </div>
         </div>
       </div>

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Heart, ListMusic, Music, Play, Plus, ArrowLeft, Trash2 } from 'lucide-react';
 import api from '../api/axios';
@@ -11,7 +11,7 @@ import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { toast } from 'react-hot-toast';
 
 import useRoomStore from '../stores/roomStore';
-import usePlayerStore from '../stores/playerStore';
+import useplaybackStore from '../stores/playbackStore';
 import socket from '../socket/socket';
 
 export default function LibraryPage() {
@@ -37,7 +37,7 @@ export default function LibraryPage() {
   const [contextMenu, setContextMenu] = useState(null);
 
   const { currentRoom } = useRoomStore();
-  const { actionSequence } = usePlayerStore();
+  const { actionSequence } = useplaybackStore();
 
   const addTrackToStore = useRoomStore(s => s.addTrack);
 

@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { Home, Heart, Library as LibraryIcon, ListMusic } from 'lucide-react';
+import { Home, Heart, Library as LibraryIcon, ListMusic, Search } from 'lucide-react';
 
 export default function Sidebar() {
   const navLinkClass = "flex items-center gap-3 px-4 py-3 rounded-xl text-gray-400 font-medium transition-all duration-200 hover:bg-white/5 hover:text-white mb-1 w-full text-left";
@@ -20,6 +20,14 @@ export default function Sidebar() {
               <>
                 <Home size={20} className={isActive ? 'text-primary' : ''} />
                 <span>Home</span>
+              </>
+            )}
+          </NavLink>
+          <NavLink to="/search" className={({ isActive }) => `${navLinkClass} ${isActive ? activeLinkClass : ''}`}>
+            {({ isActive }) => (
+              <>
+                <Search size={20} className={isActive ? 'text-primary' : ''} />
+                <span>Search</span>
               </>
             )}
           </NavLink>

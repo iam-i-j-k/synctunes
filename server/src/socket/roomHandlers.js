@@ -14,8 +14,8 @@ function registerRoomHandlers(io, socket, roomCache) {
   const userId = socket.data.user.userId;
 
   // clock:sync — NTP-style, must respond immediately with no async gap
-  socket.on('clock:sync', ({ clientTime }) => {
-    socket.emit('clock:syncResponse', { clientTime, serverTime: Date.now() });
+  socket.on('clock:sync', ({ t0 }) => {
+    socket.emit('clock:syncResponse', { t0, t1: Date.now(), t2: Date.now() });
   });
 
   // room:join

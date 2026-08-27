@@ -8,13 +8,22 @@ const mediaAssetSchema = new mongoose.Schema(
       unique: true,
       index: true,
     },
+    source: {
+      type: String,
+      enum: ['CLOUDINARY', 'YOUTUBE'],
+      default: 'CLOUDINARY',
+    },
+    youtubeId: {
+      type: String,
+      index: true,
+    },
     cloudinaryUrl: {
       type: String,
-      required: true,
+      required: function() { return this.source === 'CLOUDINARY'; },
     },
     cloudinaryPublicId: {
       type: String,
-      required: true,
+      required: function() { return this.source === 'CLOUDINARY'; },
     },
     durationMs: {
       type: Number,

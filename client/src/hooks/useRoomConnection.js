@@ -1,14 +1,14 @@
-import { useEffect } from 'react';
+﻿import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import socket from '../socket/socket';
 import useRoomStore from '../stores/roomStore';
-import usePlayerStore from '../stores/playerStore';
+import useplaybackStore from '../stores/playbackStore';
 import api from '../api/axios';
 
 export function useRoomConnection() {
   const navigate = useNavigate();
   const { setRoom, setMembers, addTrack, removeTrack, clearRoom } = useRoomStore();
-  const { applyPlaybackUpdate } = usePlayerStore();
+  const { applyPlaybackUpdate } = useplaybackStore();
 
   useEffect(() => {
     function onRoomState({ room, members, actionSequence }) {

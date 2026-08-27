@@ -1,8 +1,10 @@
 import { useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Plus, UploadCloud, X, Music, Check } from 'lucide-react';
+import { Plus, UploadCloud, X, Music, Check, PlaySquare, Globe, HardDrive } from 'lucide-react';
 import api from '../api/axios';
 import useRoomStore from '../stores/roomStore';
+import YouTubeSearch from './YouTubeSearch';
+import GlobalTrackSearch from './GlobalTrackSearch';
 
 const MAX_SIZE = 15 * 1024 * 1024; // 15 MB
 const ALLOWED_EXTS = ['.mp3', '.wav', '.m4a'];
@@ -12,6 +14,8 @@ export default function TrackUpload() {
   const fileRef = useRef(null);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState('LOCAL'); // LOCAL, YOUTUBE, GLOBAL
+  
   // Array of { id, file, title, progress, status: 'pending'|'uploading'|'success'|'error', errorMsg }
   const [uploadItems, setUploadItems] = useState([]);
   const [dragActive, setDragActive] = useState(false);
@@ -24,6 +28,7 @@ export default function TrackUpload() {
     setUploadItems([]);
     setGlobalError('');
     setDragActive(false);
+    setActiveTab('LOCAL');
   }
 
   function validateFile(f) {
@@ -111,7 +116,6 @@ export default function TrackUpload() {
     const pendingItems = uploadItems.filter(item => item.status === 'pending' || item.status === 'error');
     if (pendingItems.length === 0) return;
 
-    // Validate inputs before uploading
     let validationFailed = false;
     pendingItems.forEach(item => {
       if (!item.title.trim()) {
@@ -181,120 +185,148 @@ export default function TrackUpload() {
               </button>
             </div>
             
-            {uploadItems.length === 0 ? (
-              <div 
-                className={`flex flex-col items-center justify-center p-10 border-2 border-dashed rounded-xl transition-all cursor-pointer flex-1 ${dragActive ? 'border-primary bg-primary/5' : 'border-white/20 hover:border-white/40 hover:bg-white/5'}`}
-                onDragEnter={handleDrag}
-                onDragLeave={handleDrag}
-                onDragOver={handleDrag}
-                onDrop={handleDrop}
-                onClick={handleZoneClick}
+            <div className="flex bg-black/20 p-1 rounded-xl mb-6">
+              <button
+                className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-semibold transition-colors ${activeTab === 'LOCAL' ? 'bg-white/10 text-white shadow-sm' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
+                onClick={() => setActiveTab('LOCAL')}
               >
-                <input
-                  ref={fileRef}
-                  type="file"
-                  accept=".mp3,.wav,.m4a"
-                  onChange={handleFileChange}
-                  multiple
-                  className="hidden"
-                />
-                <UploadCloud size={48} className="text-primary mb-4" />
-                <div className="text-lg font-semibold text-white mb-2">Click or drag audio files here</div>
-                <div className="text-sm text-gray-400">Supports multiple MP3, WAV, M4A (Max 15MB each)</div>
-              </div>
-            ) : (
-              <form onSubmit={handleUploadAll} className="flex flex-col flex-1 overflow-hidden">
-                <div className="flex flex-col gap-4 overflow-y-auto pr-2 flex-1 custom-scrollbar">
-                  {uploadItems.map((item) => (
-                    <div key={item.id} className="bg-white/[0.04] rounded-xl p-4 relative border border-white/5">
-                      <div className="flex items-center gap-4 mb-4">
-                        <div className="w-10 h-10 rounded-lg bg-primary/20 text-primary flex items-center justify-center flex-shrink-0">
-                          <Music size={20} />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="text-sm font-semibold text-white truncate">
-                            {item.file.name}
-                          </div>
-                          <div className="text-xs text-gray-400">
-                            {(item.file.size / 1024 / 1024).toFixed(2)} MB
-                          </div>
-                        </div>
-                        {item.status !== 'uploading' && item.status !== 'success' && (
-                          <button 
-                            type="button" 
-                            className="px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-lg text-sm font-semibold transition-colors border border-red-500/20" 
-                            onClick={() => removeItem(item.id)}
-                          >
-                            Remove
-                          </button>
-                        )}
-                        {item.status === 'success' && (
-                          <span className="flex items-center gap-1 text-primary text-sm font-bold">
-                            <Check size={16} /> Done
-                          </span>
-                        )}
-                      </div>
+                <HardDrive size={16} /> Local MP3
+              </button>
+              <button
+                className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-semibold transition-colors ${activeTab === 'YOUTUBE' ? 'bg-red-500/20 text-red-500 shadow-sm' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
+                onClick={() => setActiveTab('YOUTUBE')}
+              >
+                <PlaySquare size={16} /> YouTube
+              </button>
+              <button
+                className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-semibold transition-colors ${activeTab === 'GLOBAL' ? 'bg-primary/20 text-primary shadow-sm' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
+                onClick={() => setActiveTab('GLOBAL')}
+              >
+                <Globe size={16} /> Library
+              </button>
+            </div>
 
-                      <div className="grid grid-cols-1 gap-3">
-                        <input
-                          placeholder="Title"
-                          value={item.title}
-                          onChange={(e) => updateItem(item.id, 'title', e.target.value)}
-                          maxLength={100}
-                          disabled={item.status === 'uploading' || item.status === 'success'}
-                          className={`w-full px-3 py-2 bg-black/20 border ${item.errorMsg ? 'border-red-500' : 'border-white/10'} rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-primary/50 disabled:opacity-50 transition-colors`}
-                        />
-                      </div>
-                      
-                      {item.errorMsg && (
-                        <div className="text-red-500 text-xs mt-2">
-                          {item.errorMsg}
-                        </div>
-                      )}
-
-                      {item.status === 'uploading' && (
-                        <div className="h-1.5 bg-white/10 rounded-full overflow-hidden mt-4">
-                          <div className="h-full bg-primary transition-all duration-200" style={{ width: `${item.progress}%` }} />
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-
-                <div className="flex-shrink-0 mt-4 border-t border-white/10 pt-4">
-                  {!allSuccess && (
-                    <div 
-                      className={`flex items-center justify-center p-3 mb-4 border-2 border-dashed rounded-xl cursor-pointer transition-colors ${dragActive ? 'border-primary bg-primary/5' : 'border-white/20 hover:border-white/40 hover:bg-white/5'}`}
-                      onDragEnter={handleDrag}
-                      onDragLeave={handleDrag}
-                      onDragOver={handleDrag}
-                      onDrop={handleDrop}
-                      onClick={handleZoneClick}
-                    >
-                      <input
-                        ref={fileRef}
-                        type="file"
-                        accept=".mp3,.wav,.m4a"
-                        onChange={handleFileChange}
-                        multiple
-                        className="hidden"
-                      />
-                      <span className="text-gray-400 text-sm font-medium">+ Add more files</span>
-                    </div>
-                  )}
-
-                  <button 
-                    type="submit" 
-                    disabled={isUploading || uploadItems.every(i => i.status === 'success')} 
-                    className="w-full py-3.5 bg-gradient-to-br from-primary to-green-600 hover:from-primary-hover hover:to-green-500 text-white font-semibold rounded-xl shadow-lg transition-all disabled:opacity-50 disabled:pointer-events-none"
+            {activeTab === 'YOUTUBE' && <YouTubeSearch closeModal={closeModal} />}
+            {activeTab === 'GLOBAL' && <GlobalTrackSearch closeModal={closeModal} />}
+            
+            {activeTab === 'LOCAL' && (
+              <>
+                {uploadItems.length === 0 ? (
+                  <div 
+                    className={`flex flex-col items-center justify-center p-10 border-2 border-dashed rounded-xl transition-all cursor-pointer flex-1 ${dragActive ? 'border-primary bg-primary/5' : 'border-white/20 hover:border-white/40 hover:bg-white/5'}`}
+                    onDragEnter={handleDrag}
+                    onDragLeave={handleDrag}
+                    onDragOver={handleDrag}
+                    onDrop={handleDrop}
+                    onClick={handleZoneClick}
                   >
-                    {isUploading ? 'Uploading...' : allSuccess ? 'All Uploads Complete' : 'Upload All Tracks'}
-                  </button>
-                </div>
-              </form>
-            )}
+                    <input
+                      ref={fileRef}
+                      type="file"
+                      accept=".mp3,.wav,.m4a"
+                      onChange={handleFileChange}
+                      multiple
+                      className="hidden"
+                    />
+                    <UploadCloud size={48} className="text-primary mb-4" />
+                    <div className="text-lg font-semibold text-white mb-2">Click or drag audio files here</div>
+                    <div className="text-sm text-gray-400">Supports multiple MP3, WAV, M4A (Max 15MB each)</div>
+                  </div>
+                ) : (
+                  <form onSubmit={handleUploadAll} className="flex flex-col flex-1 overflow-hidden">
+                    <div className="flex flex-col gap-4 overflow-y-auto pr-2 flex-1 custom-scrollbar">
+                      {uploadItems.map((item) => (
+                        <div key={item.id} className="bg-white/[0.04] rounded-xl p-4 relative border border-white/5">
+                          <div className="flex items-center gap-4 mb-4">
+                            <div className="w-10 h-10 rounded-lg bg-primary/20 text-primary flex items-center justify-center flex-shrink-0">
+                              <Music size={20} />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="text-sm font-semibold text-white truncate">
+                                {item.file.name}
+                              </div>
+                              <div className="text-xs text-gray-400">
+                                {(item.file.size / 1024 / 1024).toFixed(2)} MB
+                              </div>
+                            </div>
+                            {item.status !== 'uploading' && item.status !== 'success' && (
+                              <button 
+                                type="button" 
+                                className="px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-lg text-sm font-semibold transition-colors border border-red-500/20" 
+                                onClick={() => removeItem(item.id)}
+                              >
+                                Remove
+                              </button>
+                            )}
+                            {item.status === 'success' && (
+                              <span className="flex items-center gap-1 text-primary text-sm font-bold">
+                                <Check size={16} /> Done
+                              </span>
+                            )}
+                          </div>
 
-            {globalError && <div className="text-red-500 text-center mt-4 text-sm font-medium flex-shrink-0">{globalError}</div>}
+                          <div className="grid grid-cols-1 gap-3">
+                            <input
+                              placeholder="Title"
+                              value={item.title}
+                              onChange={(e) => updateItem(item.id, 'title', e.target.value)}
+                              maxLength={100}
+                              disabled={item.status === 'uploading' || item.status === 'success'}
+                              className={`w-full px-3 py-2 bg-black/20 border ${item.errorMsg ? 'border-red-500' : 'border-white/10'} rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-primary/50 disabled:opacity-50 transition-colors`}
+                            />
+                          </div>
+                          
+                          {item.errorMsg && (
+                            <div className="text-red-500 text-xs mt-2">
+                              {item.errorMsg}
+                            </div>
+                          )}
+
+                          {item.status === 'uploading' && (
+                            <div className="h-1.5 bg-white/10 rounded-full overflow-hidden mt-4">
+                              <div className="h-full bg-primary transition-all duration-200" style={{ width: `${item.progress}%` }} />
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="flex-shrink-0 mt-4 border-t border-white/10 pt-4">
+                      {!allSuccess && (
+                        <div 
+                          className={`flex items-center justify-center p-3 mb-4 border-2 border-dashed rounded-xl cursor-pointer transition-colors ${dragActive ? 'border-primary bg-primary/5' : 'border-white/20 hover:border-white/40 hover:bg-white/5'}`}
+                          onDragEnter={handleDrag}
+                          onDragLeave={handleDrag}
+                          onDragOver={handleDrag}
+                          onDrop={handleDrop}
+                          onClick={handleZoneClick}
+                        >
+                          <input
+                            ref={fileRef}
+                            type="file"
+                            accept=".mp3,.wav,.m4a"
+                            onChange={handleFileChange}
+                            multiple
+                            className="hidden"
+                          />
+                          <span className="text-gray-400 text-sm font-medium">+ Add more files</span>
+                        </div>
+                      )}
+
+                      <button 
+                        type="submit" 
+                        disabled={isUploading || uploadItems.every(i => i.status === 'success')} 
+                        className="w-full py-3.5 bg-gradient-to-br from-primary to-green-600 hover:from-primary-hover hover:to-green-500 text-white font-semibold rounded-xl shadow-lg transition-all disabled:opacity-50 disabled:pointer-events-none"
+                      >
+                        {isUploading ? 'Uploading...' : allSuccess ? 'All Uploads Complete' : 'Upload All Tracks'}
+                      </button>
+                    </div>
+                  </form>
+                )}
+                {globalError && <div className="text-red-500 text-center mt-4 text-sm font-medium flex-shrink-0">{globalError}</div>}
+              </>
+            )}
+            
           </div>
         </div>,
         document.body

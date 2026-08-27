@@ -1,16 +1,17 @@
 import { useEffect, useRef, useState } from 'react';
 import { Play, Pause, SkipForward, SkipBack, Volume2, VolumeX, Heart, Music, Shuffle, Repeat, Maximize2, Minimize2, ChevronDown, MoreVertical, Share2, ListMusic, MonitorSpeaker } from 'lucide-react';
 import socket from '../socket/socket';
-import usePlayerStore from '../stores/playerStore';
+import usePlaybackStore from '../stores/playbackStore';
 import useRoomStore from '../stores/roomStore';
 import useAuthStore from '../stores/authStore';
 import api from '../api/axios';
-import { useDriftCorrection } from '../hooks/useDriftCorrection';
+import { usePlaybackSync } from '../hooks/usePlaybackSync';
+import { Howler } from 'howler';
 import { toast } from 'react-hot-toast';
 import ContextMenu from './ContextMenu';
 import AddToPlaylistModal from './AddToPlaylistModal';
 import { downloadTrack } from '../utils/downloadTrack';
-
+import YouTube from 'react-youtube';
 function formatSec(sec) {
   if (isNaN(sec) || !isFinite(sec) || sec < 0) return '0:00';
   const m = Math.floor(sec / 60);
@@ -41,7 +42,6 @@ function stringToDarkGradient(str = '') {
 }
 
 export default function AudioPlayer() {
-  const audioRef = useRef(null);
   const seekingRef = useRef(false);
   const prevVolumeRef = useRef(1);
 
@@ -52,8 +52,17 @@ export default function AudioPlayer() {
     currentTrackId,
     playbackMode,
     applyPlaybackUpdate,
-    getAuthorisedPositionMs,
-  } = usePlayerStore();
+    howlInstance,
+    loadAndPlayTrack,
+    stopTrack,
+    serverStartTime,
+    startPosition,
+    ytPlayer,
+    setYtPlayer,
+    currentTrackSource,
+    clientServerOffset,
+    pendingYoutubeId
+  } = usePlaybackStore();
 
   const tracks = useRoomStore((s) => s.tracks);
   const currentTrack = tracks.find((t) => t._id === currentTrackId) || null;
@@ -64,8 +73,6 @@ export default function AudioPlayer() {
     const saved = localStorage.getItem('synctunes_volume');
     return saved !== null ? parseFloat(saved) : 1;
   });
-  const [seeking, setSeeking] = useState(false);
-  const [seekValue, setSeekValue] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isMobileExpanded, setIsMobileExpanded] = useState(false);
   const [contextMenu, setContextMenu] = useState(null);
@@ -145,50 +152,80 @@ export default function AudioPlayer() {
     return () => clearTimeout(timer);
   }, [currentTrackId, playbackState.isPlaying, roomId]);
 
-  useDriftCorrection(audioRef, roomId);
+  usePlaybackSync(roomId);
 
   useEffect(() => {
-    const audio = audioRef.current;
-    if (!audio || !currentTrack) return;
-
-    const positionMs = getAuthorisedPositionMs();
-    const positionSec = positionMs / 1000;
-
+    if (!currentTrack) return;
+    
     if (playbackState.isPlaying) {
-      // Only hard-seek if we are off by more than 2 seconds (e.g. someone used the seek bar).
-      // For minor desyncs, useDriftCorrection will smoothly speed up/slow down the audio to align perfectly!
-      if (audio.readyState > 0 && Math.abs(audio.currentTime - positionSec) > 2.0) {
-        audio.currentTime = positionSec;
-        setCurrentTime(audio.currentTime);
+      if (currentTrack.cloudinaryUrl || currentTrack.source === 'YOUTUBE') {
+        const audioUrl = currentTrack.cloudinaryUrl || '';
+        loadAndPlayTrack(audioUrl, playbackState.serverStartTime, playbackState.startPosition, currentTrack.source, currentTrack.youtubeId);
       }
-      audio.play().catch(() => {});
     } else {
-      audio.pause();
-      if (audio.readyState > 0 && Math.abs(audio.currentTime - positionSec) > 0.5) {
-        audio.currentTime = positionSec;
-        setCurrentTime(audio.currentTime);
-      } else if (audio.readyState > 0) {
-        setCurrentTime(audio.currentTime);
+      stopTrack();
+    }
+  }, [playbackState.isPlaying, currentTrackId, playbackState.serverStartTime, playbackState.startPosition, currentTrack?.source]);
+
+  // Drive YouTube player reactively: only when ytPlayer is ready AND we have a pending YouTube track
+  useEffect(() => {
+    if (!ytPlayer || !pendingYoutubeId || currentTrackSource !== 'YOUTUBE') return;
+    if (!playbackState.isPlaying) {
+      try { ytPlayer.pauseVideo(); } catch(e) {}
+      return;
+    }
+
+    const correctedNow = Date.now() + clientServerOffset;
+    const elapsedSeconds = (correctedNow - playbackState.serverStartTime) / 1000;
+    const targetPosition = playbackState.startPosition + elapsedSeconds;
+    
+    try {
+      const currentVideoUrl = ytPlayer.getVideoUrl();
+      const isAlreadyPlayingThisVideo = currentVideoUrl && currentVideoUrl.includes(pendingYoutubeId);
+
+      if (!isAlreadyPlayingThisVideo) {
+        ytPlayer.loadVideoById(pendingYoutubeId, Math.max(0, targetPosition));
+      } else {
+        const currentTime = ytPlayer.getCurrentTime();
+        if (Math.abs(currentTime - targetPosition) > 2) {
+          ytPlayer.seekTo(targetPosition, true);
+        }
       }
+
+      ytPlayer.setVolume(volume * 100);
+      
+      const state = ytPlayer.getPlayerState();
+      if (state !== 1 && state !== 3) {
+        ytPlayer.playVideo();
+      }
+    } catch(e) {
+      console.warn('ytPlayer not ready yet:', e);
     }
-  }, [playbackState, currentTrackId]);
+  }, [ytPlayer, pendingYoutubeId, currentTrackSource, playbackState.isPlaying, playbackState.serverStartTime, playbackState.startPosition, clientServerOffset, volume]);
+
+  // Pause ytPlayer AND stop Howl when switching sources
+  useEffect(() => {
+    if (currentTrackSource === 'CLOUDINARY' && ytPlayer) {
+      try { ytPlayer.pauseVideo(); } catch(e) {}
+    }
+    if (currentTrackSource === 'YOUTUBE' && howlInstance) {
+      try { howlInstance.stop(); } catch(e) {}
+      try { howlInstance.unload(); } catch(e) {}
+      try { Howler.stop(); } catch(e) {}
+    }
+  }, [currentTrackSource]);
 
   useEffect(() => {
-    if (audioRef.current) {
-      audioRef.current.volume = volume;
-    }
-  }, [volume, currentTrackId]);
+    Howler.volume(volume);
+    if (ytPlayer) try { ytPlayer.setVolume(volume * 100); } catch(e) {}
+  }, [volume, ytPlayer]);
 
   useEffect(() => {
-    function handlePlaybackUpdate({ playbackState: ps, actionSequence: seq, currentTrackId: tid }) {
-      applyPlaybackUpdate(ps, seq, tid);
-    }
-
+    // playback:update is already handled by useRoomConnection — only handle staleAction here
     function handleStaleAction({ currentState, actionSequence: seq }) {
       applyPlaybackUpdate(currentState.playbackState, seq, currentState.currentTrackId);
     }
 
-    socket.on('playback:update', handlePlaybackUpdate);
     socket.on('room:staleAction', handleStaleAction);
     
     function onFullscreenChange() {
@@ -197,62 +234,69 @@ export default function AudioPlayer() {
     document.addEventListener('fullscreenchange', onFullscreenChange);
 
     return () => {
-      socket.off('playback:update', handlePlaybackUpdate);
       socket.off('room:staleAction', handleStaleAction);
       document.removeEventListener('fullscreenchange', onFullscreenChange);
     };
   }, [applyPlaybackUpdate]);
 
   useEffect(() => {
-    const audio = audioRef.current;
-    if (!audio) return;
+    if (!howlInstance && !ytPlayer) return;
 
-    function onTimeUpdate() {
-      if (!seekingRef.current) setCurrentTime(audio.currentTime);
-    }
-
-    function onLoadedMetadata() {
-      if (audio.duration && audio.duration !== Infinity && !isNaN(audio.duration)) {
-        setDuration(audio.duration);
+    let frameId;
+    function updateFrame() {
+      if (!seekingRef.current) {
+        if (currentTrackSource === 'YOUTUBE' && ytPlayer) {
+          try {
+            const pos = ytPlayer.getCurrentTime();
+            if (typeof pos === 'number') setCurrentTime(pos);
+          } catch(e) {}
+        } else if (howlInstance) {
+          let pos = 0;
+          try { pos = howlInstance.seek(); } catch (e) {}
+          if (typeof pos === 'number') setCurrentTime(pos);
+        }
       }
-      // Apply initial drift correction as soon as metadata loads to prevent start-flicker
-      const positionMs = usePlayerStore.getState().getAuthorisedPositionMs();
-      const positionSec = positionMs / 1000;
-      if (Math.abs(audio.currentTime - positionSec) > 0.5) {
-        audio.currentTime = positionSec;
-      }
-      setCurrentTime(audio.currentTime);
+      frameId = requestAnimationFrame(updateFrame);
+    }
+    
+    if (playbackState.isPlaying) {
+      frameId = requestAnimationFrame(updateFrame);
+    } else if (howlInstance || ytPlayer) {
+      setCurrentTime(playbackState.startPosition);
     }
 
-    function onDurationChange() {
-      if (audio.duration && audio.duration !== Infinity && !isNaN(audio.duration)) {
-        setDuration(audio.duration);
-      }
-    }
+    return () => {
+      cancelAnimationFrame(frameId);
+    };
+  }, [howlInstance, ytPlayer, currentTrackSource, playbackState.isPlaying, playbackState.startPosition]);
 
-    function onVolumeChange() {
-      // Do nothing here, we manage volume in react state
-    }
-
-    function onEnded() {
+  useEffect(() => {
+    if (!howlInstance) return;
+    
+    const onEnd = () => {
       if (!seekingRef.current) {
         socket.emit('playback:next', { roomId, actionSequence });
       }
-    }
-
-    audio.addEventListener('timeupdate', onTimeUpdate);
-    audio.addEventListener('loadedmetadata', onLoadedMetadata);
-    audio.addEventListener('durationchange', onDurationChange);
-    audio.addEventListener('volumechange', onVolumeChange);
-    audio.addEventListener('ended', onEnded);
-    return () => {
-      audio.removeEventListener('timeupdate', onTimeUpdate);
-      audio.removeEventListener('loadedmetadata', onLoadedMetadata);
-      audio.removeEventListener('durationchange', onDurationChange);
-      audio.removeEventListener('volumechange', onVolumeChange);
-      audio.removeEventListener('ended', onEnded);
     };
-  }, [roomId, actionSequence]);
+    
+    howlInstance.on('end', onEnd);
+    
+    // Manage duration since we don't have loadedmetadata
+    if (howlInstance.duration() && !isNaN(howlInstance.duration())) {
+      setDuration(howlInstance.duration());
+    }
+    const onLoad = () => {
+      if (howlInstance.duration() && !isNaN(howlInstance.duration())) {
+        setDuration(howlInstance.duration());
+      }
+    };
+    howlInstance.on('load', onLoad);
+    
+    return () => {
+      howlInstance.off('end', onEnd);
+      howlInstance.off('load', onLoad);
+    };
+  }, [howlInstance, roomId, actionSequence]);
 
   function togglePlay() {
     if (!currentTrack) return;
@@ -311,16 +355,19 @@ export default function AudioPlayer() {
         socket.emit('playback:next', { roomId, actionSequence });
       });
       navigator.mediaSession.setActionHandler('seekto', (details) => {
-        if (audioRef.current) {
-          const seekTime = details.seekTime;
-          audioRef.current.currentTime = seekTime;
-          setCurrentTime(seekTime);
-          socket.emit('playback:seek', {
-            roomId,
-            actionSequence,
-            positionMs: Math.round(seekTime * 1000),
-          });
+        const seekTime = details.seekTime;
+        if (howlInstance) {
+          try { howlInstance.seek(seekTime); } catch(e) {}
         }
+        if (ytPlayer && currentTrackSource === 'YOUTUBE') {
+          try { ytPlayer.seekTo(seekTime, true); } catch(e) {}
+        }
+        setCurrentTime(seekTime);
+        socket.emit('playback:seek', {
+          roomId,
+          actionSequence,
+          positionMs: Math.round(seekTime * 1000),
+        });
       });
     }
   }, [currentTrack, roomId, actionSequence]);
@@ -331,19 +378,18 @@ export default function AudioPlayer() {
     }
   }, [playbackState.isPlaying]);
 
-  function handleSeekStart(e) {
+  function handleSeekStart() {
     seekingRef.current = true;
-    setSeeking(true);
-    setSeekValue(parseFloat(e.target.value));
   }
 
   function handleSeekMove(e) {
-    setSeekValue(parseFloat(e.target.value));
+    seekingRef.current = true;
+    setCurrentTime(parseFloat(e.target.value));
   }
 
   function handleSeekEnd(e) {
+    if (!seekingRef.current) return;
     seekingRef.current = false;
-    setSeeking(false);
     const positionSec = parseFloat(e.target.value);
     setCurrentTime(positionSec);
     socket.emit('playback:seek', {
@@ -358,7 +404,8 @@ export default function AudioPlayer() {
     setVolume(v);
     if (v > 0) prevVolumeRef.current = v;
     localStorage.setItem('synctunes_volume', v);
-    if (audioRef.current) audioRef.current.volume = v;
+    Howler.volume(v);
+    if (ytPlayer) ytPlayer.setVolume(v * 100);
   }
 
   function toggleMute() {
@@ -366,12 +413,14 @@ export default function AudioPlayer() {
       prevVolumeRef.current = volume;
       setVolume(0);
       localStorage.setItem('synctunes_volume', 0);
-      if (audioRef.current) audioRef.current.volume = 0;
+      Howler.volume(0);
+      if (ytPlayer) ytPlayer.setVolume(0);
     } else {
       const v = prevVolumeRef.current > 0 ? prevVolumeRef.current : 1;
       setVolume(v);
       localStorage.setItem('synctunes_volume', v);
-      if (audioRef.current) audioRef.current.volume = v;
+      Howler.volume(v);
+      if (ytPlayer) ytPlayer.setVolume(v * 100);
     }
   }
 
@@ -440,12 +489,36 @@ export default function AudioPlayer() {
     );
   }
 
-  const currentVal = seeking ? seekValue : currentTime;
+  const currentVal = currentTime;
   const seekPercentage = displayDuration > 0 ? (currentVal / displayDuration) * 100 : 0;
   const volumePercentage = volume * 100;
 
+  const onYtReady = (event) => {
+    setYtPlayer(event.target);
+    event.target.setVolume(volume * 100);
+  };
+
+  const onYtStateChange = (event) => {
+    // 1 is playing, 0 is ended
+    if (event.data === 1) {
+      setDuration(event.target.getDuration());
+    } else if (event.data === 0) {
+      if (!seekingRef.current) {
+        socket.emit('playback:next', { roomId, actionSequence });
+      }
+    }
+  };
+
   return (
     <>
+      <div className="absolute w-[1px] h-[1px] opacity-0 pointer-events-none -z-50 overflow-hidden">
+        <YouTube 
+          videoId={currentTrack?.source === 'YOUTUBE' ? currentTrack.youtubeId : undefined} 
+          opts={{ height: '1', width: '1', playerVars: { controls: 0, disablekb: 1, autoplay: 1 } }} 
+          onReady={onYtReady}
+          onStateChange={onYtStateChange}
+        />
+      </div>
       <style>{`
         @keyframes marquee {
           0% { transform: translateX(0); }
@@ -456,7 +529,7 @@ export default function AudioPlayer() {
           -webkit-mask-image: linear-gradient(to right, transparent 0%, black 5%, black 90%, transparent 100%);
         }
       `}</style>
-      <audio ref={audioRef} src={currentTrack.cloudinaryUrl} preload="auto" />
+
 
       {/* COMPACT / DESKTOP PLAYER */}
       <div 
@@ -534,14 +607,14 @@ export default function AudioPlayer() {
           </button>
           
           <button
-            className="w-10 h-10 flex items-center justify-center rounded-full bg-white text-black hover:scale-105 transition-all shadow-[0_0_20px_rgba(255,255,255,0.3)] hover:shadow-[0_0_25px_rgba(255,255,255,0.5)]"
+            className="w-9 h-9 flex items-center justify-center rounded-full bg-white text-black hover:scale-105 active:scale-95 transition-all shadow-md"
             onClick={togglePlay}
             aria-label={playbackState.isPlaying ? 'Pause' : 'Play'}
           >
             {playbackState.isPlaying ? (
-              <Pause size={18} fill="currentColor" />
+              <Pause size={16} fill="currentColor" />
             ) : (
-              <Play size={18} fill="currentColor" className="ml-0.5" />
+              <Play size={16} fill="currentColor" className="ml-1" />
             )}
           </button>
 
@@ -565,28 +638,27 @@ export default function AudioPlayer() {
         </div>
         <div className="w-full flex items-center gap-3 group">
           <span className="text-[11px] font-medium text-gray-400 w-10 text-right tabular-nums">{formatSec(currentVal)}</span>
-          <div className="relative flex-1 h-8 flex items-center cursor-pointer group/slider" style={{ '--progress-pct': `${seekPercentage}%` }}>
-            <div className="absolute inset-x-0 h-1.5 bg-white/10 rounded-full overflow-hidden pointer-events-none">
+          <div className="relative flex-1 h-5 flex items-center cursor-pointer group/slider" style={{ '--progress-pct': `${seekPercentage}%` }}>
+            <div className="absolute inset-x-0 h-1 bg-white/10 rounded-full overflow-hidden pointer-events-none group-hover/slider:h-1.5 transition-all">
               <div className="h-full bg-white group-hover/slider:bg-primary transition-colors" style={{ width: `${seekPercentage}%` }} />
             </div>
             {/* Custom thumb on hover */}
             <div 
-              className="absolute h-3 w-3 bg-white rounded-full shadow-md opacity-100 pointer-events-none -ml-1.5 z-10" 
+              className="absolute h-3 w-3 bg-white rounded-full shadow-md opacity-0 group-hover/slider:opacity-100 pointer-events-none -ml-1.5 z-10 transition-opacity" 
               style={{ left: `${seekPercentage}%` }}
             />
             <input
               type="range"
               className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
-              style={{ touchAction: 'none' }}
               min={0}
               max={displayDuration || 1}
               step={0.01}
               value={currentVal}
               onMouseDown={handleSeekStart}
+              onTouchStart={handleSeekStart}
+              onPointerUp={handleSeekEnd}
               onChange={handleSeekMove}
               onMouseUp={handleSeekEnd}
-              onTouchStart={handleSeekStart}
-              onTouchMove={handleSeekMove}
               onTouchEnd={handleSeekEnd}
               aria-label="Seek"
             />
@@ -616,12 +688,12 @@ export default function AudioPlayer() {
               <VolumeX size={18} />
             )}
           </button>
-          <div className="relative w-[100px] h-8 flex items-center group/vol">
-            <div className="absolute inset-x-0 h-1.5 bg-white/10 rounded-full overflow-hidden pointer-events-none">
+          <div className="relative w-[100px] h-5 flex items-center group/vol">
+            <div className="absolute inset-x-0 h-1 bg-white/10 rounded-full overflow-hidden pointer-events-none group-hover/vol:h-1.5 transition-all">
               <div className="h-full bg-white group-hover/vol:bg-primary transition-colors" style={{ width: `${volumePercentage}%` }} />
             </div>
             <div 
-              className="absolute h-3 w-3 bg-white rounded-full shadow-md opacity-100 pointer-events-none -ml-1.5 z-10" 
+              className="absolute h-3 w-3 bg-white rounded-full shadow-md opacity-0 group-hover/vol:opacity-100 pointer-events-none -ml-1.5 z-10 transition-opacity" 
               style={{ left: `${volumePercentage}%` }}
             />
             <input
@@ -775,16 +847,15 @@ export default function AudioPlayer() {
                   <input
                     type="range"
                     className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
-                    style={{ touchAction: 'none' }}
                     min={0}
                     max={displayDuration || 1}
                     step={0.01}
                     value={currentVal}
                     onMouseDown={handleSeekStart}
+                    onTouchStart={handleSeekStart}
+                    onPointerUp={handleSeekEnd}
                     onChange={handleSeekMove}
                     onMouseUp={handleSeekEnd}
-                    onTouchStart={handleSeekStart}
-                    onTouchMove={handleSeekMove}
                     onTouchEnd={handleSeekEnd}
                     aria-label="Seek"
                   />
@@ -866,11 +937,11 @@ export default function AudioPlayer() {
               icon: <ListMusic size={16} />,
               onClick: () => setShowAddModal(true)
             },
-            {
+            ...((contextMenu.track.source !== 'YOUTUBE' && !contextMenu.track.youtubeId) ? [{
               label: 'Download Song',
               icon: <svg role="img" height="16" width="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>,
               onClick: () => downloadTrack(contextMenu.track)
-            }
+            }] : [])
           ]}
         />
       )}

@@ -3,7 +3,7 @@ import api from '../api/axios';
 import socket from '../socket/socket';
 import useAuthStore from '../stores/authStore';
 import useRoomStore from '../stores/roomStore';
-import usePlayerStore from '../stores/playerStore';
+import useplaybackStore from '../stores/playbackStore';
 import { useState } from 'react';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import AddToPlaylistModal from './AddToPlaylistModal';
@@ -23,7 +23,7 @@ function formatMs(ms) {
 export default function TrackList() {
   const { user } = useAuthStore();
   const { currentRoom, tracks, removeTrack } = useRoomStore();
-  const { currentTrackId, actionSequence } = usePlayerStore();
+  const { currentTrackId, actionSequence } = useplaybackStore();
   const [selectedTrackForPlaylist, setSelectedTrackForPlaylist] = useState(null);
   const [contextMenu, setContextMenu] = useState(null);
 
@@ -42,6 +42,7 @@ export default function TrackList() {
   }
 
   function handleContextMenu(e, track) {
+    if (track.source === 'YOUTUBE' || track.youtubeId) return; // No options available for YouTube tracks
     e.preventDefault();
     setContextMenu({
       x: e.clientX,
@@ -103,15 +104,19 @@ export default function TrackList() {
                 const isPlaying = track._id === currentTrackId;
                 return (
                   <Draggable key={track._id} draggableId={track._id} index={index}>
-                    {(provided) => (
+                    {(provided, snapshot) => (
                       <li
                         ref={provided.innerRef}
                         {...provided.draggableProps}
+                        className={`group flex items-center py-2 px-2 md:px-4 mb-1.5 md:mb-1 rounded-lg border cursor-pointer transition-colors duration-200 ${
+                          isPlaying 
+                            ? 'bg-primary/10 border-primary/20 shadow-sm' 
+                            : 'bg-transparent border-transparent hover:bg-white/5'
+                        } ${snapshot.isDragging ? 'opacity-70 shadow-2xl bg-zinc-800' : ''}`}
                         onClick={() => handleSelect(track._id)}
                         onContextMenu={(e) => handleContextMenu(e, track)}
-                        className={`flex items-center gap-2 md:gap-4 p-2 md:p-3 rounded-lg cursor-pointer transition-colors group w-full ${isPlaying ? 'bg-white/5' : 'hover:bg-white/5'}`}
                       >
-                        <div {...provided.dragHandleProps} className="text-gray-600 hover:text-white cursor-grab active:cursor-grabbing w-6 flex justify-center opacity-50 transition-opacity">
+                        <div {...provided.dragHandleProps} className="text-gray-600 hover:text-white cursor-grab active:cursor-grabbing w-6 flex justify-center opacity-0 group-hover:opacity-50 transition-opacity">
                           <GripVertical size={16} />
                         </div>
                         <div className="flex items-center gap-3 md:gap-4 flex-1 min-w-0">
@@ -134,7 +139,7 @@ export default function TrackList() {
 
                         <button
                           type="button"
-                          className="p-2 text-gray-500 hover:text-white hover:bg-white/10 rounded-lg transition-colors ml-2 opacity-100"
+                          className="p-2 text-gray-500 hover:text-white hover:bg-white/10 rounded-lg transition-all ml-2 opacity-100 focus:opacity-100 scale-95 hover:scale-105"
                           onClick={(e) => {
                             e.stopPropagation();
                             setSelectedTrackForPlaylist(track);
@@ -144,10 +149,10 @@ export default function TrackList() {
                           <Plus size={16} />
                         </button>
 
-                        {(track.uploadedBy === user?.id || isHost) && (
+                        {((typeof track.uploadedBy === 'string' ? track.uploadedBy === user?.id : track.uploadedBy?._id === user?.id) || isHost) && (
                           <button
                             type="button"
-                            className="p-2 text-gray-500 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors ml-1 opacity-100"
+                            className="p-2 text-gray-500 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-all ml-1 opacity-100 focus:opacity-100 scale-95 hover:scale-105"
                             onClick={(e) => {
                               e.stopPropagation();
                               handleDelete(track);
@@ -180,11 +185,11 @@ export default function TrackList() {
           y={contextMenu.y} 
           onClose={() => setContextMenu(null)}
           items={[
-            {
+            ...((contextMenu.track.source !== 'YOUTUBE' && !contextMenu.track.youtubeId) ? [{
               label: 'Download Song',
               icon: <Download size={16} />,
               onClick: () => downloadTrack(contextMenu.track)
-            }
+            }] : [])
           ]}
         />
       )}

@@ -1,4 +1,8 @@
 const Room = require('../models/Room');
+const Track = require('../models/Track');
+const MediaAsset = require('../models/MediaAsset');
+const yts = require('yt-search');
+const crypto = require('crypto');
 
 function registerPlaybackHandlers(io, socket, roomCache) {
   // Helper: get room state from in-memory cache; load from DB if missing
@@ -11,8 +15,8 @@ function registerPlaybackHandlers(io, socket, roomCache) {
     const state = {
       playbackState: {
         isPlaying: room.playbackState.isPlaying,
-        startedAtServerTime: room.playbackState.startedAtServerTime,
-        pausedAtOffsetMs: room.playbackState.pausedAtOffsetMs,
+        serverStartTime: room.playbackState.serverStartTime,
+        startPosition: room.playbackState.startPosition,
       },
       actionSequence: room.actionSequence,
       currentTrackId: room.currentTrackId ? room.currentTrackId.toString() : null,
@@ -26,8 +30,8 @@ function registerPlaybackHandlers(io, socket, roomCache) {
   function persistState(roomId, state) {
     Room.findByIdAndUpdate(roomId, {
       'playbackState.isPlaying': state.playbackState.isPlaying,
-      'playbackState.startedAtServerTime': state.playbackState.startedAtServerTime,
-      'playbackState.pausedAtOffsetMs': state.playbackState.pausedAtOffsetMs,
+      'playbackState.serverStartTime': state.playbackState.serverStartTime,
+      'playbackState.startPosition': state.playbackState.startPosition,
       actionSequence: state.actionSequence,
       currentTrackId: state.currentTrackId,
       playbackMode: state.playbackMode,
@@ -66,10 +70,11 @@ function registerPlaybackHandlers(io, socket, roomCache) {
       return rejectStale(socket, state);
     }
 
-    const offset = state.playbackState.pausedAtOffsetMs || 0;
-    state.playbackState.startedAtServerTime = Date.now() - offset;
-    state.playbackState.isPlaying = true;
-    state.actionSequence += 1;
+    if (!state.playbackState.isPlaying) {
+      state.playbackState.serverStartTime = Date.now();
+      state.playbackState.isPlaying = true;
+      state.actionSequence += 1;
+    }
 
     persistState(roomId, state);
     broadcast(roomId, state);
@@ -84,8 +89,8 @@ function registerPlaybackHandlers(io, socket, roomCache) {
       return rejectStale(socket, state);
     }
 
-    state.playbackState.pausedAtOffsetMs =
-      Date.now() - state.playbackState.startedAtServerTime;
+    state.playbackState.startPosition =
+      (Date.now() - state.playbackState.serverStartTime) / 1000;
     state.playbackState.isPlaying = false;
     state.actionSequence += 1;
 
@@ -103,10 +108,10 @@ function registerPlaybackHandlers(io, socket, roomCache) {
     }
 
     if (state.playbackState.isPlaying) {
-      // Re-anchor start time so that currentPosition = positionMs right now
-      state.playbackState.startedAtServerTime = Date.now() - positionMs;
+      state.playbackState.serverStartTime = Date.now();
+      state.playbackState.startPosition = positionMs / 1000;
     } else {
-      state.playbackState.pausedAtOffsetMs = positionMs;
+      state.playbackState.startPosition = positionMs / 1000;
     }
     state.actionSequence += 1;
 
@@ -124,7 +129,7 @@ function registerPlaybackHandlers(io, socket, roomCache) {
     }
 
     state.currentTrackId = trackId;
-    state.playbackState = { isPlaying: true, startedAtServerTime: Date.now(), pausedAtOffsetMs: 0 };
+    state.playbackState = { isPlaying: true, serverStartTime: Date.now(), startPosition: 0 };
     state.actionSequence += 1;
 
     persistState(roomId, state);
@@ -184,18 +189,122 @@ function registerPlaybackHandlers(io, socket, roomCache) {
       if (nextIndex >= trackIds.length) {
         nextIndex = 0;
         if (state.playbackMode !== 'REPEAT_ALL') {
-          // NORMAL: Wrap back to the first track but pause playback
-          state.currentTrackId = trackIds[nextIndex];
-          state.playbackState = { isPlaying: false, startedAtServerTime: 0, pausedAtOffsetMs: 0 };
-          state.actionSequence += 1;
-          persistState(roomId, state);
-          return broadcast(roomId, state);
+          // AUTOPLAY LOGIC
+          const currentTrack = await Track.findById(state.currentTrackId).populate('mediaAssetId');
+          if (currentTrack && currentTrack.mediaAssetId.source === 'YOUTUBE') {
+            const titleParts = currentTrack.title.split(/\||-|:/);
+            let query = '';
+            
+            const artistLower = (currentTrack.artist || '').toLowerCase();
+            const isLabel = ['t-series', 'aditya music', 'sony', 'zee', 'saregama', 'vevo', 'music', 'records', 'tips'].some(label => artistLower.includes(label));
+            
+            if (!isLabel && currentTrack.artist) {
+              // It's a real artist channel! e.g. "Ed Sheeran"
+              query = `${currentTrack.artist} top songs`;
+            } else if (titleParts.length > 1) {
+              // Usually the second part is the movie, album, or main artist
+              query = `${titleParts[1].trim()} songs`;
+            } else {
+              // Fallback
+              query = `${currentTrack.title} audio`;
+            }
+
+            try {
+              const r = await yts(query);
+              const allTracksInRoom = await Track.find({ _id: { $in: room.trackIds } }).populate('mediaAssetId');
+              const existingYoutubeIds = allTracksInRoom.map(t => t.mediaAssetId?.youtubeId).filter(Boolean);
+
+              // Filter out videos already in the room
+              let validVideos = r.videos.filter(v => !existingYoutubeIds.includes(v.videoId));
+
+              // Filter out videos that are just different versions of the EXACT same song
+              // by finding the most prominent word in the current song title
+              const firstPartWords = titleParts[0].toLowerCase().split(/\W+/).filter(w => w.length > 3);
+              const signatureWord = firstPartWords[0];
+              
+              if (signatureWord) {
+                let nonSimilarVideos = validVideos.filter(v => !v.title.toLowerCase().includes(signatureWord));
+                if (nonSimilarVideos.length > 0) {
+                  validVideos = nonSimilarVideos;
+                }
+              }
+
+              // Pick a random video from the top 5 choices to ensure variety
+              const maxChoice = Math.min(5, validVideos.length);
+              const related = maxChoice > 0 ? validVideos[Math.floor(Math.random() * maxChoice)] : null;
+
+              if (related) {
+                // Find or create MediaAsset
+                let asset = await MediaAsset.findOne({ youtubeId: related.videoId });
+                if (!asset) {
+                  const contentHash = crypto.createHash('sha256').update(`yt_${related.videoId}`).digest('hex');
+                  asset = new MediaAsset({
+                    contentHash,
+                    source: 'YOUTUBE',
+                    youtubeId: related.videoId,
+                    durationMs: related.duration.seconds * 1000,
+                  });
+                  await asset.save();
+                } else {
+                  asset.refCount += 1;
+                  await asset.save();
+                }
+
+                // Create new Track
+                const newTrack = new Track({
+                  roomId: room._id,
+                  title: related.title,
+                  artist: related.author.name,
+                  albumArtUrl: related.thumbnail,
+                  mediaAssetId: asset._id,
+                  uploadedBy: currentTrack.uploadedBy,
+                });
+                await newTrack.save();
+
+                room.trackIds.push(newTrack._id);
+                await room.save();
+
+                // Append to trackIds array in memory so it selects it immediately
+                trackIds.push(newTrack._id.toString());
+                nextIndex = trackIds.length - 1;
+
+                // Broadcast track added to all users in room
+                const populatedTrack = await Track.findById(newTrack._id).populate('mediaAssetId').populate('uploadedBy', 'username');
+                
+                // Format track for client
+                const formattedTrack = {
+                  _id: populatedTrack._id,
+                  title: populatedTrack.title,
+                  artist: populatedTrack.artist,
+                  albumArtUrl: populatedTrack.albumArtUrl,
+                  source: populatedTrack.mediaAssetId.source,
+                  youtubeId: populatedTrack.mediaAssetId.youtubeId,
+                  cloudinaryUrl: populatedTrack.mediaAssetId.cloudinaryUrl,
+                  durationMs: populatedTrack.mediaAssetId.durationMs,
+                  uploadedBy: populatedTrack.uploadedBy,
+                };
+
+                io.to(`room:${roomId}`).emit('room:trackAdded', { track: formattedTrack });
+              }
+            } catch (err) {
+              console.error('Autoplay search error:', err);
+            }
+          }
+
+          if (nextIndex === 0) {
+            // NORMAL: Wrap back to the first track but pause playback if autoplay failed/wasn't youtube
+            state.currentTrackId = trackIds[nextIndex];
+            state.playbackState = { isPlaying: false, serverStartTime: 0, startPosition: 0 };
+            state.actionSequence += 1;
+            persistState(roomId, state);
+            return broadcast(roomId, state);
+          }
         }
       }
     }
 
     state.currentTrackId = trackIds[nextIndex];
-    state.playbackState = { isPlaying: true, startedAtServerTime: Date.now(), pausedAtOffsetMs: 0 };
+    state.playbackState = { isPlaying: true, serverStartTime: Date.now(), startPosition: 0 };
     state.actionSequence += 1;
 
     persistState(roomId, state);
@@ -216,14 +325,13 @@ function registerPlaybackHandlers(io, socket, roomCache) {
 
     // If playing for more than 3 seconds, restart the current track
     const currentPosition = state.playbackState.isPlaying 
-      ? Date.now() - state.playbackState.startedAtServerTime 
-      : state.playbackState.pausedAtOffsetMs;
+      ? (Date.now() - state.playbackState.serverStartTime) / 1000 
+      : state.playbackState.startPosition;
       
-    if (currentPosition > 3000) {
+    if (currentPosition > 3) {
       if (state.playbackState.isPlaying) {
-        state.playbackState.startedAtServerTime = Date.now();
-      } else {
-        state.playbackState.pausedAtOffsetMs = 0;
+        state.playbackState.serverStartTime = Date.now();
+        state.playbackState.startPosition = 0;
       }
       state.actionSequence += 1;
       persistState(roomId, state);
@@ -248,7 +356,7 @@ function registerPlaybackHandlers(io, socket, roomCache) {
     }
 
     state.currentTrackId = trackIds[prevIndex];
-    state.playbackState = { isPlaying: true, startedAtServerTime: Date.now(), pausedAtOffsetMs: 0 };
+    state.playbackState = { isPlaying: true, serverStartTime: Date.now(), startPosition: 0 };
     state.actionSequence += 1;
 
     persistState(roomId, state);

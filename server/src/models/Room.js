@@ -3,8 +3,8 @@ const mongoose = require('mongoose');
 const playbackStateSchema = new mongoose.Schema(
   {
     isPlaying: { type: Boolean, default: false },
-    startedAtServerTime: { type: Number, default: 0 }, // epoch ms
-    pausedAtOffsetMs: { type: Number, default: 0 },    // ms into track
+    serverStartTime: { type: Number, default: 0 }, // epoch ms
+    startPosition: { type: Number, default: 0 },    // seconds into track
   },
   { _id: false }
 );
@@ -62,7 +62,7 @@ const roomSchema = new mongoose.Schema(
     },
     playbackState: {
       type: playbackStateSchema,
-      default: () => ({ isPlaying: false, startedAtServerTime: 0, pausedAtOffsetMs: 0 }),
+      default: () => ({ isPlaying: false, serverStartTime: 0, startPosition: 0 }),
     },
     actionSequence: {
       type: Number,

@@ -4,8 +4,7 @@ import api from '../api/axios';
 import socket, { connectSocket } from '../socket/socket';
 import useAuthStore from '../stores/authStore';
 import useRoomStore from '../stores/roomStore';
-import usePlayerStore from '../stores/playerStore';
-import { useClockSync } from '../hooks/useClockSync';
+import useplaybackStore from '../stores/playbackStore';
 import RoomHeader from '../components/RoomHeader';
 import MemberList from '../components/MemberList';
 import TrackList from '../components/TrackList';
@@ -16,7 +15,7 @@ export default function RoomPage() {
   const { id: roomId } = useParams();
   const navigate = useNavigate();
   const { currentRoom, tracks, setRoom, setMembers, setTracks, addTrack, removeTrack, clearRoom } = useRoomStore();
-  const { playbackState, actionSequence, currentTrackId, applyPlaybackUpdate, clearPlayer } = usePlayerStore();
+  const { playbackState, actionSequence, currentTrackId, applyPlaybackUpdate, clearPlayer } = useplaybackStore();
 
   function handlePlayPauseRoom() {
     if (!currentRoom) return;
@@ -37,7 +36,6 @@ export default function RoomPage() {
   const [loadingRoom, setLoadingRoom] = useState(true);
   const [roomError, setRoomError] = useState('');
 
-  useClockSync();
 
   const token = useAuthStore((s) => s.token);
 
@@ -121,7 +119,7 @@ export default function RoomPage() {
         )}
       </main>
 
-      <aside className="w-full xl:w-[320px] bg-zinc-950 border-t xl:border-t-0 xl:border-l border-white/5 flex-shrink-0 flex flex-col xl:h-full max-h-[300px] xl:max-h-full overflow-y-auto">
+      <aside className="w-full xl:w-[320px] bg-zinc-950/50 flex-shrink-0 flex flex-col xl:h-full max-h-[300px] xl:max-h-full overflow-y-auto">
         <MemberList />
       </aside>
     </div>

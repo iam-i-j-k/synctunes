@@ -32,7 +32,10 @@ export default function MemberList() {
           return (
             <li key={m.userId} className={`flex items-center gap-3 p-2.5 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 transition-colors group ${!m.isOnline && !isMe ? 'opacity-50' : 'opacity-100'}`}>
               {m.isOnline || isMe ? (
-                <span className="w-2.5 h-2.5 rounded-full bg-primary shadow-[0_0_8px_rgba(30,215,96,0.8)]" />
+                <span className="relative flex w-2.5 h-2.5">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+                  <span className="relative inline-flex rounded-full w-2.5 h-2.5 bg-primary shadow-[0_0_8px_rgba(30,215,96,0.8)]"></span>
+                </span>
               ) : (
                 <span className="w-2.5 h-2.5 rounded-full bg-gray-500/50" />
               )}
@@ -49,7 +52,7 @@ export default function MemberList() {
               {isHost && !isThisHost && !isMe && (
                 <button
                   type="button"
-                  className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-white/10 rounded-lg transition-all opacity-100 flex-shrink-0"
+                  className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-white/10 rounded-lg transition-all opacity-0 group-hover:opacity-100 flex-shrink-0 scale-95 hover:scale-105"
                   onClick={() => handleKick(m.userId)}
                   title={`Kick ${m.username}`}
                 >

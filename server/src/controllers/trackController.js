@@ -35,6 +35,8 @@ function formatTrack(track) {
     obj.cloudinaryUrl = obj.mediaAssetId.cloudinaryUrl;
     obj.cloudinaryPublicId = obj.mediaAssetId.cloudinaryPublicId;
     obj.durationMs = obj.mediaAssetId.durationMs;
+    obj.source = obj.mediaAssetId.source;
+    obj.youtubeId = obj.mediaAssetId.youtubeId;
   }
   return obj;
 }
@@ -322,12 +324,14 @@ async function deleteTrack(req, res) {
         );
 
         if (asset && asset.refCount <= 0) {
-          const cloudinary = getCloudinary();
-          try {
-            await cloudinary.uploader.destroy(asset.cloudinaryPublicId, { resource_type: 'video' });
-          } catch (cloudErr) {
-            console.warn(`Cloudinary destroy failed for ${asset.cloudinaryPublicId}:`, cloudErr);
-            cloudinaryWarning = `Cloudinary delete failed for publicId ${asset.cloudinaryPublicId}. File may need manual cleanup.`;
+          if (asset.source !== 'YOUTUBE' && asset.cloudinaryPublicId) {
+            const cloudinary = getCloudinary();
+            try {
+              await cloudinary.uploader.destroy(asset.cloudinaryPublicId, { resource_type: 'video' });
+            } catch (cloudErr) {
+              console.warn(`Cloudinary destroy failed for ${asset.cloudinaryPublicId}:`, cloudErr);
+              cloudinaryWarning = `Cloudinary delete failed for publicId ${asset.cloudinaryPublicId}. File may need manual cleanup.`;
+            }
           }
           await MediaAsset.findByIdAndDelete(asset._id);
         }

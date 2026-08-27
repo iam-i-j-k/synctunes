@@ -12,11 +12,11 @@ export default defineConfig({
     },
     proxy: {
       '/api': {
-        target: 'https://synctunes-umst.onrender.com',
+        target: 'http://localhost:4000',
         changeOrigin: true,
       },
       '/socket.io': {
-        target: 'https://synctunes-umst.onrender.com',
+        target: 'http://localhost:4000',
         changeOrigin: true,
         ws: true,
       },

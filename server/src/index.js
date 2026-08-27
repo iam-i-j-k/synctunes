@@ -15,6 +15,7 @@ const userRoutes = require('./routes/users');
 const playlistRoutes = require('./routes/playlists');
 const searchRoutes = require('./routes/search');
 const notificationRoutes = require('./routes/notifications');
+const youtubeRoutes = require('./routes/youtube');
 
 const app = express();
 const server = http.createServer(app);
@@ -28,6 +29,7 @@ app.use(
 app.use(express.json());
 
 // ── Routes ───────────────────────────────────────────────────────────────────
+app.use('/api/youtube', youtubeRoutes); // MUST BE BEFORE /api (trackRoutes)
 app.use('/api/auth', authRoutes);
 app.use('/api/rooms', roomRoutes);
 app.use('/api', trackRoutes);

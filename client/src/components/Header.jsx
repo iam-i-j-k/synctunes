@@ -3,7 +3,7 @@ import { Search, Bell, User, LogOut, Music, Home as HomeIcon, X } from 'lucide-r
 import { useNavigate } from 'react-router-dom';
 import useAuthStore from '../stores/authStore';
 import useRoomStore from '../stores/roomStore';
-import usePlayerStore from '../stores/playerStore';
+import useplaybackStore from '../stores/playbackStore';
 import { disconnectSocket } from '../socket/socket';
 import socket from '../socket/socket';
 import api from '../api/axios';
@@ -22,53 +22,17 @@ export default function Header() {
   const navigate = useNavigate();
   const { user, logout } = useAuthStore();
   const { currentRoom, addTrack: addTrackToStore } = useRoomStore();
-  const { actionSequence } = usePlayerStore();
+  const { actionSequence } = useplaybackStore();
 
-  const [query, setQuery] = useState('');
-  const [results, setResults] = useState({ tracks: [], rooms: [] });
-  const [showDropdown, setShowDropdown] = useState(false);
-  const [searching, setSearching] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [showNotifications, setShowNotifications] = useState(false);
 
-  const searchRef = useRef(null);
   const notifRef = useRef(null);
-  const debounceRef = useRef(null);
 
-  // Debounced search
-  const handleSearch = useCallback((q) => {
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    if (!q.trim()) {
-      setResults({ tracks: [], rooms: [] });
-      setShowDropdown(false);
-      return;
-    }
-    setSearching(true);
-    setShowDropdown(true);
-    debounceRef.current = setTimeout(async () => {
-      try {
-        const { data } = await api.get(`/search?q=${encodeURIComponent(q.trim())}`);
-        setResults(data);
-      } catch (err) {
-        console.error('Search failed:', err);
-      } finally {
-        setSearching(false);
-      }
-    }, 300);
-  }, []);
-
-  useEffect(() => {
-    handleSearch(query);
-    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
-  }, [query, handleSearch]);
-
-  // Click outside to close search
+  // Click outside to close notifications
   useEffect(() => {
     function handleClickOutside(e) {
-      if (searchRef.current && !searchRef.current.contains(e.target)) {
-        setShowDropdown(false);
-      }
       if (notifRef.current && !notifRef.current.contains(e.target)) {
         setShowNotifications(false);
       }
@@ -109,34 +73,6 @@ export default function Header() {
     }
   }
 
-  async function playTrack(track) {
-    try {
-      const { data: { room } } = await api.post('/rooms/personal');
-      await api.post(`/rooms/${room._id}/tracks/add-existing`, { trackId: track._id }).catch(console.error);
-      
-      const isRoomPage = window.location.pathname.startsWith('/room/');
-      const isOnPersonalRoomPage = window.location.pathname === `/room/${room._id}`;
-
-      // If they are on a shared room page, navigate them to their personal room
-      if (isRoomPage && !isOnPersonalRoomPage) {
-        navigate(`/room/${room._id}`);
-      } else if (currentRoom?._id !== room._id) {
-        // Otherwise just join the personal room quietly (e.g. from Lobby or Profile)
-        socket.emit('room:join', { roomId: room._id });
-      }
-
-      // Small delay to ensure the join goes through before playing
-      setTimeout(() => {
-        socket.emit('playback:trackChange', { roomId: room._id, trackId: track._id, actionSequence: 0 });
-      }, 150);
-
-      setShowDropdown(false);
-      setQuery('');
-    } catch (err) {
-      console.error('Play track failed:', err);
-    }
-  }
-
   function handleLogout() {
     disconnectSocket();
     logout();
@@ -154,124 +90,10 @@ export default function Header() {
     return `${days}d ago`;
   }
 
-  const hasResults = results.tracks.length > 0 || results.rooms.length > 0;
-
   return (
     <header className="h-16 flex items-center justify-between px-3 md:px-6 bg-zinc-950/50 backdrop-blur-md border-b border-white/5 z-10 sticky top-0">
-      {/* Search Bar */}
-      <div ref={searchRef} className="hidden md:block relative w-full max-w-sm">
-        <div className="flex items-center bg-white/5 rounded-full px-4 py-2 w-full border border-white/5 focus-within:border-primary/50 focus-within:bg-white/10 transition-colors">
-          <Search size={18} className="text-gray-400 mr-2 flex-shrink-0" />
-          <input
-            type="text"
-            placeholder="Search for rooms or tracks..."
-            className="bg-transparent border-none text-white text-sm w-full outline-none placeholder:text-gray-500"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onFocus={() => { if (query.trim()) setShowDropdown(true); }}
-          />
-          {query && (
-            <button onClick={() => { setQuery(''); setShowDropdown(false); }} className="text-gray-400 hover:text-white ml-1">
-              <X size={16} />
-            </button>
-          )}
-        </div>
-
-        {/* Search Dropdown */}
-        {showDropdown && (
-          <div className="absolute top-full left-0 right-0 mt-2 bg-zinc-900 border border-white/10 rounded-2xl shadow-2xl overflow-hidden z-50 max-h-[70vh] overflow-y-auto animate-in fade-in slide-in-from-top-2">
-            {searching && !hasResults && (
-              <div className="flex items-center justify-center py-8">
-                <div className="w-6 h-6 border-2 border-white/20 border-t-primary rounded-full animate-spin" />
-              </div>
-            )}
-
-            {!searching && !hasResults && query.trim() && (
-              <div className="py-8 text-center text-gray-400">
-                <Search size={32} className="mx-auto mb-3 opacity-40" />
-                <p className="text-sm font-medium">No results for &quot;{query}&quot;</p>
-              </div>
-            )}
-
-            {/* Track Results */}
-            {results.tracks.length > 0 && (
-              <div>
-                <div className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-wider text-gray-500 bg-black/20 border-b border-white/5">
-                  🎵 Tracks
-                </div>
-                {results.tracks.map((track) => (
-                  <button
-                    key={track._id}
-                    className="flex items-center gap-3 w-full px-4 py-2.5 hover:bg-white/5 transition-colors text-left group"
-                    onClick={() => playTrack(track)}
-                  >
-                    <div className="w-10 h-10 rounded-lg bg-zinc-800 flex-shrink-0 overflow-hidden shadow-md">
-                      {track.albumArtUrl ? (
-                        <img src={track.albumArtUrl} alt="" className="w-full h-full object-cover" />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center">
-                          <Music size={16} className="text-gray-500" />
-                        </div>
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm font-semibold text-white truncate group-hover:text-primary transition-colors">
-                        {track.title}
-                      </div>
-                      {track.artist && (
-                        <div className="text-xs text-gray-400 truncate">{track.artist}</div>
-                      )}
-                    </div>
-                    {track.durationMs && (
-                      <div className="text-xs text-gray-500 flex-shrink-0">
-                        {Math.floor(track.durationMs / 60000)}:{String(Math.floor((track.durationMs % 60000) / 1000)).padStart(2, '0')}
-                      </div>
-                    )}
-                  </button>
-                ))}
-              </div>
-            )}
-
-            {/* Room Results */}
-            {results.rooms.length > 0 && (
-              <div>
-                <div className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-wider text-gray-500 bg-black/20 border-b border-white/5">
-                  🏠 Rooms
-                </div>
-                {results.rooms.map((room) => {
-                  const covers = Array.from(new Set((room.trackIds || []).map(t => t?.albumArtUrl).filter(Boolean))).slice(0, 1);
-                  return (
-                    <button
-                      key={room._id}
-                      className="flex items-center gap-3 w-full px-4 py-2.5 hover:bg-white/5 transition-colors text-left group"
-                      onClick={() => { navigate(`/room/${room._id}`); setShowDropdown(false); setQuery(''); }}
-                    >
-                      <div className="w-10 h-10 rounded-lg bg-zinc-800 flex-shrink-0 overflow-hidden shadow-md">
-                        {covers.length > 0 ? (
-                          <img src={covers[0]} alt="" className="w-full h-full object-cover" />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center" style={{ background: stringToGradient(room._id) }}>
-                            <span className="text-sm font-bold text-white/90">{room.name.substring(0, 2).toUpperCase()}</span>
-                          </div>
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="text-sm font-semibold text-white truncate group-hover:text-primary transition-colors">
-                          {room.name}
-                        </div>
-                        <div className="text-xs text-gray-400">
-                          {room.hostId?.username || 'Unknown'} · {room.memberIds?.length || 0} members
-                        </div>
-                      </div>
-                      <HomeIcon size={14} className="text-gray-500 flex-shrink-0" />
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        )}
-      </div>
+      {/* Search Bar Removed (Now handled in global /search page) */}
+      <div className="hidden md:block flex-1"></div>
 
       {/* Right side controls */}
       <div className="flex items-center gap-2 md:gap-4 ml-auto">
