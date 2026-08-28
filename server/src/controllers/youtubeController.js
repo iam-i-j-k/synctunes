@@ -49,8 +49,8 @@ const urlCache = new Map();
 async function streamYouTube(req, res) {
   try {
     let { videoId } = req.params;
-    if (videoId && videoId.endsWith('.webm')) {
-      videoId = videoId.replace('.webm', '');
+    if (videoId) {
+      videoId = videoId.replace('.webm', '').replace('.m4a', '');
     }
     
     if (!videoId) {
@@ -64,7 +64,7 @@ async function streamYouTube(req, res) {
       try {
         const output = await youtubedl(videoUrl, {
           dumpJson: true,
-          format: 'bestaudio',
+          format: 'bestaudio[ext=m4a]/bestaudio',
           noWarnings: true,
           noCallHome: true,
           noCheckCertificate: true
@@ -87,7 +87,11 @@ async function streamYouTube(req, res) {
 
     // Proxy the stream using https to forward the Range header properly
     const https = require('https');
-    const options = { headers: {} };
+    const options = { 
+      headers: {
+        'User-Agent': req.headers['user-agent'] || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+      } 
+    };
     if (req.headers.range) {
       options.headers['Range'] = req.headers.range;
     }
@@ -185,7 +189,7 @@ async function addYouTubeTrack(req, res) {
         if (!urlCache.has(videoId)) {
           const output = await youtubedl(`https://www.youtube.com/watch?v=${videoId}`, {
             dumpJson: true,
-            format: 'bestaudio',
+            format: 'bestaudio[ext=m4a]/bestaudio',
             noWarnings: true,
             noCallHome: true,
             noCheckCertificate: true
@@ -212,7 +216,7 @@ async function ensurePrecached(videoId) {
   try {
     const output = await youtubedl(`https://www.youtube.com/watch?v=${videoId}`, {
       dumpJson: true,
-      format: 'bestaudio',
+      format: 'bestaudio[ext=m4a]/bestaudio',
       noWarnings: true,
       noCallHome: true,
       noCheckCertificate: true

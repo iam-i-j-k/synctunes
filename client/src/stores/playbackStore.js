@@ -39,10 +39,10 @@ const usePlaybackStore = create((set, get) => ({
     let finalUrl = url;
     if (source === 'YOUTUBE') {
       const apiUrl = import.meta.env.VITE_API_URL || '/api';
-      finalUrl = `${apiUrl}/youtube/stream/${youtubeId}.webm`;
+      finalUrl = `${apiUrl}/youtube/stream/${youtubeId}.m4a`;
     }
 
-    const formatHint = finalUrl.includes('youtube/stream') ? ['webm', 'mp3'] : undefined;
+    const formatHint = finalUrl.includes('youtube/stream') ? ['m4a', 'mp3'] : undefined;
 
     const howlInstance = new Howl({
       src: [finalUrl],
