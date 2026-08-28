@@ -9,11 +9,8 @@ import { usePlaybackSync } from '../hooks/usePlaybackSync';
 import { Howler } from 'howler';
 import { toast } from 'react-hot-toast';
 import ContextMenu from './ContextMenu';
-import AddToPlaylistModal from './AddToPlaylistModal';
 import { downloadTrack } from '../utils/downloadTrack';
-
-// Disable Howler autoSuspend so it doesn't pause audio in the background on mobile
-Howler.autoSuspend = false;
+import AddToPlaylistModal from './AddToPlaylistModal';
 
 function formatSec(sec) {
   if (isNaN(sec) || !isFinite(sec) || sec < 0) return '0:00';
