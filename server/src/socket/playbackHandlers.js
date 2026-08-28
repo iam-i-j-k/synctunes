@@ -128,12 +128,28 @@ function registerPlaybackHandlers(io, socket, roomCache) {
       return rejectStale(socket, state);
     }
 
+    // Step 1: Update the UI immediately to show the new track, but PAUSED
     state.currentTrackId = trackId;
-    state.playbackState = { isPlaying: true, serverStartTime: Date.now(), startPosition: 0 };
+    state.playbackState = { isPlaying: false, serverStartTime: 0, startPosition: 0 };
     state.actionSequence += 1;
-
     persistState(roomId, state);
     broadcast(roomId, state);
+
+    // Step 2: Precache the track URL in the background (takes ~8s for YouTube)
+    const track = await Track.findById(trackId).populate('mediaAssetId');
+    if (track && track.mediaAssetId && track.mediaAssetId.source === 'YOUTUBE') {
+      const { ensurePrecached } = require('../controllers/youtubeController');
+      await ensurePrecached(track.mediaAssetId.youtubeId);
+    }
+
+    // Step 3: Refresh state and start playing if they didn't skip to another track!
+    const newState = await getState(roomId);
+    if (newState.currentTrackId === trackId && !newState.playbackState.isPlaying) {
+      newState.playbackState = { isPlaying: true, serverStartTime: Date.now(), startPosition: 0 };
+      newState.actionSequence += 1;
+      persistState(roomId, newState);
+      broadcast(roomId, newState);
+    }
   });
 
   // ── playback:heartbeat ─────────────────────────────────────────────────────
@@ -303,12 +319,28 @@ function registerPlaybackHandlers(io, socket, roomCache) {
       }
     }
 
+    // Step 1: Update UI to new track, paused
     state.currentTrackId = trackIds[nextIndex];
-    state.playbackState = { isPlaying: true, serverStartTime: Date.now(), startPosition: 0 };
+    state.playbackState = { isPlaying: false, serverStartTime: 0, startPosition: 0 };
     state.actionSequence += 1;
-
     persistState(roomId, state);
     broadcast(roomId, state);
+
+    // Step 2: Precache
+    const track = await Track.findById(state.currentTrackId).populate('mediaAssetId');
+    if (track && track.mediaAssetId && track.mediaAssetId.source === 'YOUTUBE') {
+      const { ensurePrecached } = require('../controllers/youtubeController');
+      await ensurePrecached(track.mediaAssetId.youtubeId);
+    }
+
+    // Step 3: Play if still on this track
+    const newState = await getState(roomId);
+    if (newState.currentTrackId === trackIds[nextIndex] && !newState.playbackState.isPlaying) {
+      newState.playbackState = { isPlaying: true, serverStartTime: Date.now(), startPosition: 0 };
+      newState.actionSequence += 1;
+      persistState(roomId, newState);
+      broadcast(roomId, newState);
+    }
   });
 
   // ── playback:prev ──────────────────────────────────────────────────────────
@@ -355,12 +387,28 @@ function registerPlaybackHandlers(io, socket, roomCache) {
       }
     }
 
+    // Step 1: Update UI to new track, paused
     state.currentTrackId = trackIds[prevIndex];
-    state.playbackState = { isPlaying: true, serverStartTime: Date.now(), startPosition: 0 };
+    state.playbackState = { isPlaying: false, serverStartTime: 0, startPosition: 0 };
     state.actionSequence += 1;
-
     persistState(roomId, state);
     broadcast(roomId, state);
+
+    // Step 2: Precache
+    const track = await Track.findById(state.currentTrackId).populate('mediaAssetId');
+    if (track && track.mediaAssetId && track.mediaAssetId.source === 'YOUTUBE') {
+      const { ensurePrecached } = require('../controllers/youtubeController');
+      await ensurePrecached(track.mediaAssetId.youtubeId);
+    }
+
+    // Step 3: Play if still on this track
+    const newState = await getState(roomId);
+    if (newState.currentTrackId === trackIds[prevIndex] && !newState.playbackState.isPlaying) {
+      newState.playbackState = { isPlaying: true, serverStartTime: Date.now(), startPosition: 0 };
+      newState.actionSequence += 1;
+      persistState(roomId, newState);
+      broadcast(roomId, newState);
+    }
   });
 }
 

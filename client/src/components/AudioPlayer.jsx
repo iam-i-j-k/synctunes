@@ -11,7 +11,7 @@ import { toast } from 'react-hot-toast';
 import ContextMenu from './ContextMenu';
 import AddToPlaylistModal from './AddToPlaylistModal';
 import { downloadTrack } from '../utils/downloadTrack';
-import YouTube from 'react-youtube';
+
 function formatSec(sec) {
   if (isNaN(sec) || !isFinite(sec) || sec < 0) return '0:00';
   const m = Math.floor(sec / 60);
@@ -57,11 +57,8 @@ export default function AudioPlayer() {
     stopTrack,
     serverStartTime,
     startPosition,
-    ytPlayer,
-    setYtPlayer,
     currentTrackSource,
-    clientServerOffset,
-    pendingYoutubeId
+    clientServerOffset
   } = usePlaybackStore();
 
   const tracks = useRoomStore((s) => s.tracks);
@@ -167,48 +164,9 @@ export default function AudioPlayer() {
     }
   }, [playbackState.isPlaying, currentTrackId, playbackState.serverStartTime, playbackState.startPosition, currentTrack?.source]);
 
-  // Drive YouTube player reactively: only when ytPlayer is ready AND we have a pending YouTube track
+  // Stop Howl when switching sources
   useEffect(() => {
-    if (!ytPlayer || !pendingYoutubeId || currentTrackSource !== 'YOUTUBE') return;
-    if (!playbackState.isPlaying) {
-      try { ytPlayer.pauseVideo(); } catch(e) {}
-      return;
-    }
-
-    const correctedNow = Date.now() + clientServerOffset;
-    const elapsedSeconds = (correctedNow - playbackState.serverStartTime) / 1000;
-    const targetPosition = playbackState.startPosition + elapsedSeconds;
-    
-    try {
-      const currentVideoUrl = ytPlayer.getVideoUrl();
-      const isAlreadyPlayingThisVideo = currentVideoUrl && currentVideoUrl.includes(pendingYoutubeId);
-
-      if (!isAlreadyPlayingThisVideo) {
-        ytPlayer.loadVideoById(pendingYoutubeId, Math.max(0, targetPosition));
-      } else {
-        const currentTime = ytPlayer.getCurrentTime();
-        if (Math.abs(currentTime - targetPosition) > 2) {
-          ytPlayer.seekTo(targetPosition, true);
-        }
-      }
-
-      ytPlayer.setVolume(volume * 100);
-      
-      const state = ytPlayer.getPlayerState();
-      if (state !== 1 && state !== 3) {
-        ytPlayer.playVideo();
-      }
-    } catch(e) {
-      console.warn('ytPlayer not ready yet:', e);
-    }
-  }, [ytPlayer, pendingYoutubeId, currentTrackSource, playbackState.isPlaying, playbackState.serverStartTime, playbackState.startPosition, clientServerOffset, volume]);
-
-  // Pause ytPlayer AND stop Howl when switching sources
-  useEffect(() => {
-    if (currentTrackSource === 'CLOUDINARY' && ytPlayer) {
-      try { ytPlayer.pauseVideo(); } catch(e) {}
-    }
-    if (currentTrackSource === 'YOUTUBE' && howlInstance) {
+    if (howlInstance) {
       try { howlInstance.stop(); } catch(e) {}
       try { howlInstance.unload(); } catch(e) {}
       try { Howler.stop(); } catch(e) {}
@@ -217,8 +175,7 @@ export default function AudioPlayer() {
 
   useEffect(() => {
     Howler.volume(volume);
-    if (ytPlayer) try { ytPlayer.setVolume(volume * 100); } catch(e) {}
-  }, [volume, ytPlayer]);
+  }, [volume]);
 
   useEffect(() => {
     // playback:update is already handled by useRoomConnection — only handle staleAction here
@@ -240,17 +197,12 @@ export default function AudioPlayer() {
   }, [applyPlaybackUpdate]);
 
   useEffect(() => {
-    if (!howlInstance && !ytPlayer) return;
+    if (!howlInstance) return;
 
     let frameId;
     function updateFrame() {
       if (!seekingRef.current) {
-        if (currentTrackSource === 'YOUTUBE' && ytPlayer) {
-          try {
-            const pos = ytPlayer.getCurrentTime();
-            if (typeof pos === 'number') setCurrentTime(pos);
-          } catch(e) {}
-        } else if (howlInstance) {
+        if (howlInstance) {
           let pos = 0;
           try { pos = howlInstance.seek(); } catch (e) {}
           if (typeof pos === 'number') setCurrentTime(pos);
@@ -261,14 +213,14 @@ export default function AudioPlayer() {
     
     if (playbackState.isPlaying) {
       frameId = requestAnimationFrame(updateFrame);
-    } else if (howlInstance || ytPlayer) {
+    } else if (howlInstance) {
       setCurrentTime(playbackState.startPosition);
     }
 
     return () => {
       cancelAnimationFrame(frameId);
     };
-  }, [howlInstance, ytPlayer, currentTrackSource, playbackState.isPlaying, playbackState.startPosition]);
+  }, [howlInstance, currentTrackSource, playbackState.isPlaying, playbackState.startPosition]);
 
   useEffect(() => {
     if (!howlInstance) return;
@@ -359,9 +311,6 @@ export default function AudioPlayer() {
         if (howlInstance) {
           try { howlInstance.seek(seekTime); } catch(e) {}
         }
-        if (ytPlayer && currentTrackSource === 'YOUTUBE') {
-          try { ytPlayer.seekTo(seekTime, true); } catch(e) {}
-        }
         setCurrentTime(seekTime);
         socket.emit('playback:seek', {
           roomId,
@@ -405,7 +354,6 @@ export default function AudioPlayer() {
     if (v > 0) prevVolumeRef.current = v;
     localStorage.setItem('synctunes_volume', v);
     Howler.volume(v);
-    if (ytPlayer) ytPlayer.setVolume(v * 100);
   }
 
   function toggleMute() {
@@ -414,13 +362,11 @@ export default function AudioPlayer() {
       setVolume(0);
       localStorage.setItem('synctunes_volume', 0);
       Howler.volume(0);
-      if (ytPlayer) ytPlayer.setVolume(0);
     } else {
       const v = prevVolumeRef.current > 0 ? prevVolumeRef.current : 1;
       setVolume(v);
       localStorage.setItem('synctunes_volume', v);
       Howler.volume(v);
-      if (ytPlayer) ytPlayer.setVolume(v * 100);
     }
   }
 
@@ -493,32 +439,8 @@ export default function AudioPlayer() {
   const seekPercentage = displayDuration > 0 ? (currentVal / displayDuration) * 100 : 0;
   const volumePercentage = volume * 100;
 
-  const onYtReady = (event) => {
-    setYtPlayer(event.target);
-    event.target.setVolume(volume * 100);
-  };
-
-  const onYtStateChange = (event) => {
-    // 1 is playing, 0 is ended
-    if (event.data === 1) {
-      setDuration(event.target.getDuration());
-    } else if (event.data === 0) {
-      if (!seekingRef.current) {
-        socket.emit('playback:next', { roomId, actionSequence });
-      }
-    }
-  };
-
   return (
     <>
-      <div className="absolute w-[1px] h-[1px] opacity-0 pointer-events-none -z-50 overflow-hidden">
-        <YouTube 
-          videoId={currentTrack?.source === 'YOUTUBE' ? currentTrack.youtubeId : undefined} 
-          opts={{ height: '1', width: '1', playerVars: { controls: 0, disablekb: 1, autoplay: 1 } }} 
-          onReady={onYtReady}
-          onStateChange={onYtStateChange}
-        />
-      </div>
       <style>{`
         @keyframes marquee {
           0% { transform: translateX(0); }

@@ -1,5 +1,4 @@
-const yts = require('yt-search');
-const ytdl = require('@distube/ytdl-core');
+const youtubedl = require('youtube-dl-exec');
 const crypto = require('crypto');
 const Track = require('../models/Track');
 const MediaAsset = require('../models/MediaAsset');
@@ -12,15 +11,31 @@ async function searchYouTube(req, res) {
       return res.json({ videos: [] });
     }
 
-    const r = await yts(q.trim());
-    // Only return the top 15 videos
-    const videos = r.videos.slice(0, 15).map(v => ({
-      id: v.videoId,
-      title: v.title,
-      artist: v.author.name,
-      thumbnail: v.thumbnail,
-      durationMs: v.duration.seconds * 1000,
-    }));
+    const output = await youtubedl(`ytsearch15:${q.trim()}`, {
+      dumpSingleJson: true,
+      noWarnings: true,
+      flatPlaylist: true,
+      noCallHome: true,
+      noCheckCertificate: true
+    });
+
+    if (!output || !output.entries) {
+      return res.json({ videos: [] });
+    }
+
+    const videos = output.entries.map(v => {
+      let thumbnail = '';
+      if (v.thumbnails && v.thumbnails.length > 0) {
+        thumbnail = v.thumbnails[v.thumbnails.length - 1].url;
+      }
+      return {
+        id: v.id,
+        title: v.title,
+        artist: v.uploader || 'YouTube',
+        thumbnail: thumbnail,
+        durationMs: (v.duration || 0) * 1000,
+      };
+    });
 
     return res.json({ videos });
   } catch (err) {
@@ -28,6 +43,8 @@ async function searchYouTube(req, res) {
     return res.status(500).json({ message: 'Server error during YouTube search' });
   }
 }
+
+const urlCache = new Map();
 
 async function streamYouTube(req, res) {
   try {
@@ -41,20 +58,57 @@ async function streamYouTube(req, res) {
     }
 
     const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
+    let streamUrl = urlCache.get(videoId);
 
-    // Configure response headers for audio stream
-    res.setHeader('Content-Type', 'audio/webm');
+    if (!streamUrl) {
+      try {
+        const output = await youtubedl(videoUrl, {
+          dumpJson: true,
+          format: 'bestaudio',
+          noWarnings: true,
+          noCallHome: true,
+          noCheckCertificate: true
+        });
+        streamUrl = output.url;
+        if (streamUrl) {
+          urlCache.set(videoId, streamUrl);
+          // Keep cache for 3 hours (YouTube URLs eventually expire)
+          setTimeout(() => urlCache.delete(videoId), 3 * 60 * 60 * 1000);
+        }
+      } catch (err) {
+        console.error('yt-dlp extract error:', err.message);
+        return res.status(500).json({ message: 'Failed to extract stream URL' });
+      }
+    }
 
-    const stream = ytdl(videoUrl, { filter: 'audioonly', quality: 'highestaudio' });
-    
-    stream.on('error', (err) => {
-      console.error('ytdl stream error:', err.message);
+    if (!streamUrl) {
+      return res.status(500).json({ message: 'Stream URL not found' });
+    }
+
+    // Proxy the stream using https to forward the Range header properly
+    const https = require('https');
+    const options = { headers: {} };
+    if (req.headers.range) {
+      options.headers['Range'] = req.headers.range;
+    }
+
+    const proxyReq = https.get(streamUrl, options, (proxyRes) => {
+      // Forward all relevant headers from the proxy response (includes 206 Partial Content, Content-Length, Content-Range)
+      res.writeHead(proxyRes.statusCode, proxyRes.headers);
+      proxyRes.pipe(res);
+    });
+
+    proxyReq.on('error', (err) => {
+      console.error('Stream proxy error:', err.message);
       if (!res.headersSent) {
-        res.status(500).json({ message: 'Failed to stream audio' });
+        res.status(500).end();
       }
     });
 
-    stream.pipe(res);
+    req.on('close', () => {
+      proxyReq.destroy();
+    });
+
   } catch (err) {
     console.error('youtube stream wrapper error:', err);
     if (!res.headersSent) {
@@ -125,6 +179,27 @@ async function addYouTubeTrack(req, res) {
       io.to(`room:${roomId}`).emit('room:trackAdded', { track: formattedTrack });
     }
 
+    // Pre-cache the stream URL in the background to eliminate the 10-second delay when the user clicks play
+    setTimeout(async () => {
+      try {
+        if (!urlCache.has(videoId)) {
+          const output = await youtubedl(`https://www.youtube.com/watch?v=${videoId}`, {
+            dumpJson: true,
+            format: 'bestaudio',
+            noWarnings: true,
+            noCallHome: true,
+            noCheckCertificate: true
+          });
+          if (output && output.url) {
+            urlCache.set(videoId, output.url);
+            setTimeout(() => urlCache.delete(videoId), 3 * 60 * 60 * 1000);
+          }
+        }
+      } catch (err) {
+        console.error('Background precache failed:', err.message);
+      }
+    }, 0);
+
     return res.status(201).json({ track: formattedTrack });
   } catch (err) {
     console.error('youtube addTrack error:', err);
@@ -132,4 +207,23 @@ async function addYouTubeTrack(req, res) {
   }
 }
 
-module.exports = { searchYouTube, streamYouTube, addYouTubeTrack };
+async function ensurePrecached(videoId) {
+  if (!videoId || urlCache.has(videoId)) return;
+  try {
+    const output = await youtubedl(`https://www.youtube.com/watch?v=${videoId}`, {
+      dumpJson: true,
+      format: 'bestaudio',
+      noWarnings: true,
+      noCallHome: true,
+      noCheckCertificate: true
+    });
+    if (output && output.url) {
+      urlCache.set(videoId, output.url);
+      setTimeout(() => urlCache.delete(videoId), 3 * 60 * 60 * 1000);
+    }
+  } catch (err) {
+    console.error('ensurePrecached failed:', err.message);
+  }
+}
+
+module.exports = { searchYouTube, streamYouTube, addYouTubeTrack, ensurePrecached };

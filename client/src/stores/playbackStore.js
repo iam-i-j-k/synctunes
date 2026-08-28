@@ -18,10 +18,8 @@ const usePlaybackStore = create((set, get) => ({
   startPosition: 0,
   isPlaying: false,
 
-  ytPlayer: null,
   currentTrackSource: null,
 
-  setYtPlayer: (player) => set({ ytPlayer: player }),
   setClockSync: (offset, rtt) => set({ clientServerOffset: offset, currentRtt: rtt }),
 
   getServerNow: () => Date.now() + get().clientServerOffset,
@@ -38,23 +36,16 @@ const usePlaybackStore = create((set, get) => ({
     // Force-stop all Howler audio globally as a safety net
     try { Howler.stop(); } catch(e) {}
 
+    let finalUrl = url;
     if (source === 'YOUTUBE') {
-      // Just set state — AudioPlayer will drive the ytPlayer via useEffect
-      set({
-        howlInstance: null,
-        currentTrackSource: 'YOUTUBE',
-        pendingYoutubeId: youtubeId,
-        serverStartTime,
-        startPosition,
-        isPlaying: true,
-      });
-      return;
+      const apiUrl = import.meta.env.VITE_API_URL || '/api';
+      finalUrl = `${apiUrl}/youtube/stream/${youtubeId}.webm`;
     }
 
-    const formatHint = url.includes('youtube/stream') ? ['webm', 'mp3'] : undefined;
+    const formatHint = finalUrl.includes('youtube/stream') ? ['webm', 'mp3'] : undefined;
 
     const howlInstance = new Howl({
-      src: [url],
+      src: [finalUrl],
       format: formatHint,
       html5: true,
       preload: true,
@@ -74,8 +65,8 @@ const usePlaybackStore = create((set, get) => ({
 
     set({
       howlInstance,
-      currentTrackSource: 'CLOUDINARY',
-      pendingYoutubeId: null,
+      currentTrackSource: source,
+      pendingYoutubeId: source === 'YOUTUBE' ? youtubeId : null,
       serverStartTime,
       startPosition,
       isPlaying: true,
@@ -89,10 +80,6 @@ const usePlaybackStore = create((set, get) => ({
       try { pos = state.howlInstance.seek() || pos; } catch (e) {}
       state.howlInstance.stop();
       state.howlInstance.unload();
-    }
-    if (state.ytPlayer && state.currentTrackSource === 'YOUTUBE') {
-      try { pos = state.ytPlayer.getCurrentTime() || pos; } catch (e) {}
-      state.ytPlayer.pauseVideo();
     }
     set({
       howlInstance: null,
