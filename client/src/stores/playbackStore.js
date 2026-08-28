@@ -55,6 +55,15 @@ const usePlaybackStore = create((set, get) => ({
           this.unload();
           return;
         }
+
+        // CRITICAL FOR MOBILE BACKGROUND PLAY:
+        // iOS Safari suspends <audio> elements in the background if they are not attached to the DOM!
+        const audioNode = this._sounds?.[0]?._node;
+        if (audioNode && !document.body.contains(audioNode)) {
+          audioNode.style.display = 'none';
+          document.body.appendChild(audioNode);
+        }
+
         const correctedNow = get().getServerNow();
         const elapsedSeconds = (correctedNow - serverStartTime) / 1000;
         const targetPosition = startPosition + elapsedSeconds;

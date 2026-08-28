@@ -58,52 +58,57 @@ export function usePlaybackSync(roomId) {
       
       let localTrackPosition = 0;
 
-      if (currentTrackSource === 'YOUTUBE' && ytPlayer) {
-        try {
-          if (ytPlayer.getPlayerState) {
-            const state = ytPlayer.getPlayerState();
-            // state 3 is buffering, let it buffer without seeking
-            if (state === 3) return;
-            // state 2 is paused, force play if we should be playing
-            if (state === 2 || state === -1 || state === 5) {
-              ytPlayer.playVideo();
-              return;
+      // Skip drift correction if the app is in the background. 
+      // Background programmatic seeking or rate adjustments usually cause iOS/Android 
+      // to forcibly suspend the AudioContext.
+      if (!document.hidden && document.visibilityState !== 'hidden') {
+        if (currentTrackSource === 'YOUTUBE' && ytPlayer) {
+          try {
+            if (ytPlayer.getPlayerState) {
+              const state = ytPlayer.getPlayerState();
+              // state 3 is buffering, let it buffer without seeking
+              if (state === 3) return;
+              // state 2 is paused, force play if we should be playing
+              if (state === 2 || state === -1 || state === 5) {
+                ytPlayer.playVideo();
+                return;
+              }
             }
+            localTrackPosition = ytPlayer.getCurrentTime();
+          } catch (e) {
+            return;
           }
-          localTrackPosition = ytPlayer.getCurrentTime();
-        } catch (e) {
-          return;
-        }
-        
-        if (typeof localTrackPosition !== 'number') return;
-        
-        const drift = targetTrackPosition - localTrackPosition;
-        const absDrift = Math.abs(drift);
-        
-        if (absDrift > 2.0) {
-          ytPlayer.seekTo(targetTrackPosition, true);
-        } else {
-          try { ytPlayer.setPlaybackRate(1.0); } catch(e) {}
-        }
-      } else if (howlInstance) {
-        try {
-          localTrackPosition = howlInstance.seek();
-        } catch (e) {
-          return;
-        }
-        
-        if (typeof localTrackPosition !== 'number') return;
-        
-        const drift = targetTrackPosition - localTrackPosition;
-        const absDrift = Math.abs(drift);
-        
-        if (absDrift > 0.3) {
-          howlInstance.seek(targetTrackPosition);
-          try { howlInstance.rate(1.0); } catch(e) {}
-        } else if (absDrift > 0.02 && absDrift <= 0.3) {
-          try { howlInstance.rate(drift > 0 ? 1.01 : 0.99); } catch(e) {}
-        } else {
-          try { howlInstance.rate(1.0); } catch(e) {}
+          
+          if (typeof localTrackPosition !== 'number') return;
+          
+          const drift = targetTrackPosition - localTrackPosition;
+          const absDrift = Math.abs(drift);
+          
+          if (absDrift > 2.0) {
+            ytPlayer.seekTo(targetTrackPosition, true);
+          } else {
+            try { ytPlayer.setPlaybackRate(1.0); } catch(e) {}
+          }
+        } else if (howlInstance) {
+          try {
+            localTrackPosition = howlInstance.seek();
+          } catch (e) {
+            return;
+          }
+          
+          if (typeof localTrackPosition !== 'number') return;
+          
+          const drift = targetTrackPosition - localTrackPosition;
+          const absDrift = Math.abs(drift);
+          
+          if (absDrift > 0.3) {
+            howlInstance.seek(targetTrackPosition);
+            try { howlInstance.rate(1.0); } catch(e) {}
+          } else if (absDrift > 0.02 && absDrift <= 0.3) {
+            try { howlInstance.rate(drift > 0 ? 1.01 : 0.99); } catch(e) {}
+          } else {
+            try { howlInstance.rate(1.0); } catch(e) {}
+          }
         }
       }
     }, DRIFT_INTERVAL_MS);

@@ -12,6 +12,9 @@ import ContextMenu from './ContextMenu';
 import AddToPlaylistModal from './AddToPlaylistModal';
 import { downloadTrack } from '../utils/downloadTrack';
 
+// Disable Howler autoSuspend so it doesn't pause audio in the background on mobile
+Howler.autoSuspend = false;
+
 function formatSec(sec) {
   if (isNaN(sec) || !isFinite(sec) || sec < 0) return '0:00';
   const m = Math.floor(sec / 60);
