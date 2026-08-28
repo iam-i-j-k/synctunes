@@ -58,9 +58,9 @@ async function streamYouTube(req, res) {
     }
 
     const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
-    let streamUrl = urlCache.get(videoId);
+    let cachedData = urlCache.get(videoId);
 
-    if (!streamUrl) {
+    if (!cachedData) {
       try {
         const output = await youtubedl(videoUrl, {
           dumpJson: true,
@@ -69,10 +69,10 @@ async function streamYouTube(req, res) {
           noCallHome: true,
           noCheckCertificate: true
         });
-        streamUrl = output.url;
-        if (streamUrl) {
-          urlCache.set(videoId, streamUrl);
-          // Keep cache for 3 hours (YouTube URLs eventually expire)
+        if (output && output.url) {
+          cachedData = { url: output.url, headers: output.http_headers || {} };
+          urlCache.set(videoId, cachedData);
+          // Keep cache for 3 hours
           setTimeout(() => urlCache.delete(videoId), 3 * 60 * 60 * 1000);
         }
       } catch (err) {
@@ -81,22 +81,24 @@ async function streamYouTube(req, res) {
       }
     }
 
-    if (!streamUrl) {
+    if (!cachedData || !cachedData.url) {
       return res.status(500).json({ message: 'Stream URL not found' });
     }
 
     // Proxy the stream using https to forward the Range header properly
     const https = require('https');
-    const options = { 
-      headers: {
-        'User-Agent': req.headers['user-agent'] || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-      } 
-    };
+    const options = { headers: { ...cachedData.headers } };
+    
+    // Ensure User-Agent is present
+    if (!options.headers['User-Agent']) {
+      options.headers['User-Agent'] = req.headers['user-agent'] || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+    }
+    
     if (req.headers.range) {
       options.headers['Range'] = req.headers.range;
     }
 
-    const proxyReq = https.get(streamUrl, options, (proxyRes) => {
+    const proxyReq = https.get(cachedData.url, options, (proxyRes) => {
       // Forward all relevant headers from the proxy response (includes 206 Partial Content, Content-Length, Content-Range)
       res.writeHead(proxyRes.statusCode, proxyRes.headers);
       proxyRes.pipe(res);
@@ -195,7 +197,7 @@ async function addYouTubeTrack(req, res) {
             noCheckCertificate: true
           });
           if (output && output.url) {
-            urlCache.set(videoId, output.url);
+            urlCache.set(videoId, { url: output.url, headers: output.http_headers || {} });
             setTimeout(() => urlCache.delete(videoId), 3 * 60 * 60 * 1000);
           }
         }
@@ -222,7 +224,7 @@ async function ensurePrecached(videoId) {
       noCheckCertificate: true
     });
     if (output && output.url) {
-      urlCache.set(videoId, output.url);
+      urlCache.set(videoId, { url: output.url, headers: output.http_headers || {} });
       setTimeout(() => urlCache.delete(videoId), 3 * 60 * 60 * 1000);
     }
   } catch (err) {
