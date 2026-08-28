@@ -44,50 +44,7 @@ async function searchYouTube(req, res) {
   }
 }
 
-const path = require('path');
-const fs = require('fs');
-
-const CACHE_DIR = path.join(__dirname, '../../cache');
-if (!fs.existsSync(CACHE_DIR)) {
-  fs.mkdirSync(CACHE_DIR, { recursive: true });
-}
-
-// Keep track of downloads in progress so we don't download the same file twice simultaneously
-const downloadPromises = new Map();
-
-async function downloadToCache(videoId) {
-  const filePath = path.join(CACHE_DIR, `${videoId}.m4a`);
-  
-  if (fs.existsSync(filePath)) {
-    return filePath; // Already cached
-  }
-
-  if (downloadPromises.has(videoId)) {
-    return downloadPromises.get(videoId);
-  }
-
-  const promise = new Promise(async (resolve, reject) => {
-    try {
-      const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
-      await youtubedl(videoUrl, {
-        format: 'bestaudio[ext=m4a]/bestaudio',
-        output: filePath,
-        noWarnings: true,
-        noCallHome: true,
-        noCheckCertificate: true,
-      });
-      resolve(filePath);
-    } catch (err) {
-      console.error('yt-dlp download error:', err.message);
-      reject(err);
-    } finally {
-      downloadPromises.delete(videoId);
-    }
-  });
-
-  downloadPromises.set(videoId, promise);
-  return promise;
-}
+const urlCache = new Map();
 
 async function streamYouTube(req, res) {
   try {
@@ -100,13 +57,63 @@ async function streamYouTube(req, res) {
       return res.status(400).json({ message: 'Video ID is required' });
     }
 
-    try {
-      const filePath = await downloadToCache(videoId);
-      // Let Express handle the streaming, Range requests, and chunking perfectly!
-      return res.sendFile(filePath);
-    } catch (err) {
-      return res.status(500).json({ message: 'Failed to download and stream track' });
+    const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
+    let cachedData = urlCache.get(videoId);
+
+    if (!cachedData) {
+      try {
+        const output = await youtubedl(videoUrl, {
+          dumpJson: true,
+          format: 'bestaudio[ext=m4a]/bestaudio',
+          noWarnings: true,
+          noCallHome: true,
+          noCheckCertificate: true
+        });
+        if (output && output.url) {
+          cachedData = { url: output.url, headers: output.http_headers || {} };
+          urlCache.set(videoId, cachedData);
+          // Keep cache for 3 hours
+          setTimeout(() => urlCache.delete(videoId), 3 * 60 * 60 * 1000);
+        }
+      } catch (err) {
+        console.error('yt-dlp extract error:', err.message);
+        return res.status(500).json({ message: 'Failed to extract stream URL' });
+      }
     }
+
+    if (!cachedData || !cachedData.url) {
+      return res.status(500).json({ message: 'Stream URL not found' });
+    }
+
+    // Proxy the stream using https to forward the Range header properly
+    const https = require('https');
+    const options = { headers: { ...cachedData.headers } };
+    
+    // Ensure User-Agent is present
+    if (!options.headers['User-Agent']) {
+      options.headers['User-Agent'] = req.headers['user-agent'] || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+    }
+    
+    if (req.headers.range) {
+      options.headers['Range'] = req.headers.range;
+    }
+
+    const proxyReq = https.get(cachedData.url, options, (proxyRes) => {
+      // Forward all relevant headers from the proxy response (includes 206 Partial Content, Content-Length, Content-Range)
+      res.writeHead(proxyRes.statusCode, proxyRes.headers);
+      proxyRes.pipe(res);
+    });
+
+    proxyReq.on('error', (err) => {
+      console.error('Stream proxy error:', err.message);
+      if (!res.headersSent) {
+        res.status(500).end();
+      }
+    });
+
+    req.on('close', () => {
+      proxyReq.destroy();
+    });
   } catch (err) {
     console.error('youtube stream wrapper error:', err);
     if (!res.headersSent) {
@@ -177,10 +184,22 @@ async function addYouTubeTrack(req, res) {
       io.to(`room:${roomId}`).emit('room:trackAdded', { track: formattedTrack });
     }
 
-    // Pre-cache the stream URL in the background
+    // Pre-cache the stream URL in the background to eliminate the 10-second delay when the user clicks play
     setTimeout(async () => {
       try {
-        await downloadToCache(videoId);
+        if (!urlCache.has(videoId)) {
+          const output = await youtubedl(`https://www.youtube.com/watch?v=${videoId}`, {
+            dumpJson: true,
+            format: 'bestaudio[ext=m4a]/bestaudio',
+            noWarnings: true,
+            noCallHome: true,
+            noCheckCertificate: true
+          });
+          if (output && output.url) {
+            urlCache.set(videoId, { url: output.url, headers: output.http_headers || {} });
+            setTimeout(() => urlCache.delete(videoId), 3 * 60 * 60 * 1000);
+          }
+        }
       } catch (err) {
         console.error('Background precache failed:', err.message);
       }
@@ -194,9 +213,19 @@ async function addYouTubeTrack(req, res) {
 }
 
 async function ensurePrecached(videoId) {
-  if (!videoId) return;
+  if (!videoId || urlCache.has(videoId)) return;
   try {
-    await downloadToCache(videoId);
+    const output = await youtubedl(`https://www.youtube.com/watch?v=${videoId}`, {
+      dumpJson: true,
+      format: 'bestaudio[ext=m4a]/bestaudio',
+      noWarnings: true,
+      noCallHome: true,
+      noCheckCertificate: true
+    });
+    if (output && output.url) {
+      urlCache.set(videoId, { url: output.url, headers: output.http_headers || {} });
+      setTimeout(() => urlCache.delete(videoId), 3 * 60 * 60 * 1000);
+    }
   } catch (err) {
     console.error('ensurePrecached failed:', err.message);
   }
