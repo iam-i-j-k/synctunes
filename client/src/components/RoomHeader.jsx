@@ -5,6 +5,7 @@ import api from '../api/axios';
 import socket from '../socket/socket';
 import useAuthStore from '../stores/authStore';
 import useRoomStore from '../stores/roomStore';
+import usePlaybackStore from '../stores/playbackStore';
 import { toast } from 'react-hot-toast';
 
 function formatDurationMs(ms) {
@@ -75,6 +76,8 @@ export default function RoomHeader() {
   async function handleDelete() {
     try {
       await api.delete(`/rooms/${currentRoom._id}`);
+      usePlaybackStore.getState().clearPlayer();
+      useRoomStore.getState().clearRoom();
       navigate('/');
       toast.success('Room deleted');
     } catch (err) {
@@ -85,6 +88,8 @@ export default function RoomHeader() {
 
   function handleLeave() {
     socket.emit('room:leave', { roomId: currentRoom._id });
+    usePlaybackStore.getState().clearPlayer();
+    useRoomStore.getState().clearRoom();
     navigate('/');
   }
 

@@ -106,7 +106,7 @@ synctunes-YT/
 
 **Server (`server/.env`):**
 ```env
-PORT=5000
+PORT=4000
 MONGO_URI=mongodb://127.0.0.1:27017/synctunes
 JWT_SECRET=your_super_secret_key
 CLOUDINARY_CLOUD_NAME=your_cloud_name
@@ -117,8 +117,8 @@ CLIENT_ORIGIN=http://localhost:5173
 
 **Client (`client/.env`):**
 ```env
-VITE_API_URL=http://localhost:5000/api
-VITE_SOCKET_URL=http://localhost:5000
+VITE_API_URL=http://localhost:4000/api
+VITE_SOCKET_URL=http://localhost:4000
 ```
 
 ### 3. Running Locally

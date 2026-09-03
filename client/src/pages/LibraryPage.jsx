@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Heart, ListMusic, Music, Play, Plus, ArrowLeft, Trash2 } from 'lucide-react';
 import api from '../api/axios';
@@ -50,13 +50,14 @@ export default function LibraryPage() {
         api.post(`/rooms/${currentRoom._id}/tracks/add-existing`, { trackId }).catch(console.error);
         socket.emit('playback:trackChange', { roomId: currentRoom._id, trackId, actionSequence });
       } else {
-        const { data: { room } } = await api.post('/rooms', { name: 'My Library', isPrivate: true });
-        api.post(`/rooms/${room._id}/tracks/add-existing`, { trackId }).catch(console.error);
+        const { data: { room } } = await api.post('/rooms/personal');
+        await api.post(`/rooms/${room._id}/tracks/add-existing`, { trackId }).catch(console.error);
         socket.emit('room:join', { roomId: room._id });
         
         setTimeout(() => {
-          socket.emit('playback:trackChange', { roomId: room._id, trackId, actionSequence: 0 });
-        }, 50);
+          const seq = useplaybackStore.getState().actionSequence;
+          socket.emit('playback:trackChange', { roomId: room._id, trackId, actionSequence: seq });
+        }, 150);
       }
       toast.success('Track added to room queue');
     } catch (err) {

@@ -300,12 +300,43 @@ async function deleteTrack(req, res) {
 
     // 1. Remove from the target room's trackIds array
     room.trackIds = room.trackIds.filter(id => id.toString() !== track._id.toString());
+
+    // Check if the deleted track is currently playing in this room
+    let currentTrackChanged = false;
+    if (room.currentTrackId && room.currentTrackId.toString() === track._id.toString()) {
+      currentTrackChanged = true;
+      if (room.trackIds.length > 0) {
+        room.currentTrackId = room.trackIds[0];
+        room.playbackState = { isPlaying: false, serverStartTime: 0, startPosition: 0 };
+      } else {
+        room.currentTrackId = null;
+        room.playbackState = { isPlaying: false, serverStartTime: 0, startPosition: 0 };
+      }
+      room.actionSequence = (room.actionSequence || 0) + 1;
+    }
     await room.save();
 
     // 2. Broadcast removal to the room
     const io = req.app.locals.io;
     if (io) {
       io.to(`room:${targetRoomId}`).emit('room:trackRemoved', { trackId: track._id });
+      if (currentTrackChanged) {
+        try {
+          const { roomCache } = require('../socket');
+          if (roomCache && roomCache.has(targetRoomId)) {
+            const cached = roomCache.get(targetRoomId);
+            cached.currentTrackId = room.currentTrackId ? room.currentTrackId.toString() : null;
+            cached.playbackState = { ...room.playbackState };
+            cached.actionSequence = room.actionSequence;
+          }
+        } catch (e) {}
+        io.to(`room:${targetRoomId}`).emit('playback:update', {
+          playbackState: room.playbackState,
+          actionSequence: room.actionSequence,
+          currentTrackId: room.currentTrackId ? room.currentTrackId.toString() : null,
+          playbackMode: room.playbackMode || 'NORMAL',
+        });
+      }
     }
 
     // 3. Check if the track is still referenced in ANY room
@@ -364,10 +395,17 @@ async function addExistingTrack(req, res) {
     const track = await Track.findById(trackId).populate('mediaAssetId');
     if (!track) return res.status(404).json({ message: 'Track not found' });
 
-    if (!room.trackIds.includes(track._id)) {
+    const isAlreadyInRoom = room.trackIds.some(id => id && id.toString() === track._id.toString());
+    if (!isAlreadyInRoom) {
       room.trackIds.push(track._id);
       await room.save();
       
+      // Increment MediaAsset refCount so the asset is protected across rooms
+      if (track.mediaAssetId) {
+        const assetId = typeof track.mediaAssetId === 'object' ? track.mediaAssetId._id : track.mediaAssetId;
+        await MediaAsset.findByIdAndUpdate(assetId, { $inc: { refCount: 1 } });
+      }
+
       const io = req.app.locals.io;
       if (io) {
         io.to(`room:${roomId}`).emit('room:trackAdded', { track: formatTrack(track) });

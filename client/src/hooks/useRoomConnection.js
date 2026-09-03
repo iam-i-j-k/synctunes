@@ -1,9 +1,10 @@
-﻿import { useEffect } from 'react';
+import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import socket from '../socket/socket';
 import useRoomStore from '../stores/roomStore';
 import useplaybackStore from '../stores/playbackStore';
 import api from '../api/axios';
+import { toast } from 'react-hot-toast';
 
 export function useRoomConnection() {
   const navigate = useNavigate();
@@ -32,21 +33,26 @@ export function useRoomConnection() {
 
     function onKicked({ roomId: kickedFrom }) {
       const currentRoom = useRoomStore.getState().currentRoom;
-      if (currentRoom && kickedFrom.toString() === currentRoom._id.toString()) {
+      if (currentRoom && kickedFrom && kickedFrom.toString() === currentRoom._id.toString()) {
+        useplaybackStore.getState().clearPlayer();
         clearRoom();
+        toast.error('You were removed from the room');
         navigate('/');
       }
     }
 
     function onRoomDeleted({ roomId: deletedRoomId }) {
       const currentRoom = useRoomStore.getState().currentRoom;
-      // Note: room handlers emit 'room:deleted' but wait, the backend doesn't send roomId:deletedRoomId in onRoomDeleted yet, let's just clear.
-      clearRoom();
-      navigate('/');
+      if (!deletedRoomId || (currentRoom && deletedRoomId.toString() === currentRoom._id.toString())) {
+        useplaybackStore.getState().clearPlayer();
+        clearRoom();
+        toast('Room was closed by the host');
+        navigate('/');
+      }
     }
 
-    function onRoomUpdated({ name }) {
-      setRoom((prev) => (prev ? { ...prev, name } : prev));
+    function onRoomUpdated(data) {
+      setRoom((prev) => (prev ? { ...prev, ...data } : prev));
     }
 
     function onTrackAdded({ track }) {

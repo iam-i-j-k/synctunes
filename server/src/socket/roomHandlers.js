@@ -103,7 +103,7 @@ function registerRoomHandlers(io, socket, roomCache) {
 
   // room:leave
   socket.on('room:leave', ({ roomId }) => {
-    handleLeave(io, socket, roomId, userId);
+    handleLeave(io, socket, roomId, userId, roomCache);
   });
 
   // room:reorderTracks
@@ -138,9 +138,18 @@ function registerRoomHandlers(io, socket, roomCache) {
       // Update online status immediately
       broadcastMemberStatus(io, roomId);
 
-      const timer = setTimeout(() => {
+      const timer = setTimeout(async () => {
         disconnectTimers.delete(socket.id);
-        // We do NOT call handleLeave here because we want offline users to stay in the room list!
+        try {
+          // Check if this user still has another active socket in the room
+          const activeSockets = await io.in(`room:${roomId}`).fetchSockets();
+          const userStillInRoom = activeSockets.some((s) => s.data?.user?.userId === userId);
+          if (!userStillInRoom) {
+            await handleLeave(io, socket, roomId, userId, roomCache);
+          }
+        } catch (err) {
+          console.error('Grace period leave error:', err);
+        }
       }, DISCONNECT_GRACE_MS);
       disconnectTimers.set(socket.id, timer);
     }
@@ -164,18 +173,48 @@ async function broadcastMemberStatus(io, roomId) {
   }
 }
 
-async function handleLeave(io, socket, roomId, userId) {
+async function handleLeave(io, socket, roomId, userId, roomCache) {
   try {
     socket.leave(`room:${roomId}`);
 
-    // Use atomic update to avoid VersionError from concurrent saves
-    const room = await Room.findByIdAndUpdate(
+    let room = await Room.findById(roomId).populate('memberIds', 'username');
+    if (!room) return;
+
+    const isHost = room.hostId.toString() === userId;
+
+    // Use atomic pull to remove the user from memberIds
+    room = await Room.findByIdAndUpdate(
       roomId,
       { $pull: { memberIds: userId } },
       { new: true }
     ).populate('memberIds', 'username');
 
     if (!room) return;
+
+    // If the departing user is the host, transfer host to the next member
+    if (isHost) {
+      if (room.memberIds.length > 0) {
+        room.hostId = room.memberIds[0]._id;
+        await room.save();
+        io.to(`room:${roomId}`).emit('room:updated', { hostId: room.hostId });
+      } else {
+        // No members remain, pause playback
+        if (roomCache && roomCache.has(roomId)) {
+          const state = roomCache.get(roomId);
+          if (state.playbackState && state.playbackState.isPlaying) {
+            const elapsed = (Date.now() - state.playbackState.serverStartTime) / 1000;
+            state.playbackState.startPosition = (state.playbackState.startPosition || 0) + elapsed;
+            state.playbackState.isPlaying = false;
+            state.actionSequence += 1;
+            Room.findByIdAndUpdate(roomId, {
+              'playbackState.isPlaying': false,
+              'playbackState.startPosition': state.playbackState.startPosition,
+              actionSequence: state.actionSequence,
+            }).catch(() => {});
+          }
+        }
+      }
+    }
 
     const sockets = await io.in(`room:${roomId}`).fetchSockets();
     const onlineIds = new Set(sockets.map((s) => s.data?.user?.userId));

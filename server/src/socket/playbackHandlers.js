@@ -89,8 +89,8 @@ function registerPlaybackHandlers(io, socket, roomCache) {
       return rejectStale(socket, state);
     }
 
-    state.playbackState.startPosition =
-      (Date.now() - state.playbackState.serverStartTime) / 1000;
+    const elapsedSeconds = (Date.now() - state.playbackState.serverStartTime) / 1000;
+    state.playbackState.startPosition = (state.playbackState.startPosition || 0) + elapsedSeconds;
     state.playbackState.isPlaying = false;
     state.actionSequence += 1;
 
@@ -107,11 +107,12 @@ function registerPlaybackHandlers(io, socket, roomCache) {
       return rejectStale(socket, state);
     }
 
+    const safePositionMs = Math.max(0, Number(positionMs) || 0);
     if (state.playbackState.isPlaying) {
       state.playbackState.serverStartTime = Date.now();
-      state.playbackState.startPosition = positionMs / 1000;
+      state.playbackState.startPosition = safePositionMs / 1000;
     } else {
-      state.playbackState.startPosition = positionMs / 1000;
+      state.playbackState.startPosition = safePositionMs / 1000;
     }
     state.actionSequence += 1;
 
@@ -325,8 +326,8 @@ function registerPlaybackHandlers(io, socket, roomCache) {
 
     // If playing for more than 3 seconds, restart the current track
     const currentPosition = state.playbackState.isPlaying 
-      ? (Date.now() - state.playbackState.serverStartTime) / 1000 
-      : state.playbackState.startPosition;
+      ? (state.playbackState.startPosition || 0) + (Date.now() - state.playbackState.serverStartTime) / 1000 
+      : (state.playbackState.startPosition || 0);
       
     if (currentPosition > 3) {
       if (state.playbackState.isPlaying) {

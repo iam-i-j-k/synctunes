@@ -41,14 +41,18 @@ async function getPlaylist(req, res) {
 
     // Transform tracks so cloudinaryUrl/durationMs appear at top level
     const playlistObj = playlist.toObject();
-    playlistObj.trackIds = (playlistObj.trackIds || []).map(track => {
-      if (track && track.mediaAssetId && typeof track.mediaAssetId === 'object') {
-        track.cloudinaryUrl = track.mediaAssetId.cloudinaryUrl;
-        track.cloudinaryPublicId = track.mediaAssetId.cloudinaryPublicId;
-        track.durationMs = track.mediaAssetId.durationMs;
-      }
-      return track;
-    });
+    playlistObj.trackIds = (playlistObj.trackIds || [])
+      .filter((track) => track && track._id)
+      .map(track => {
+        if (track && track.mediaAssetId && typeof track.mediaAssetId === 'object') {
+          track.cloudinaryUrl = track.mediaAssetId.cloudinaryUrl;
+          track.cloudinaryPublicId = track.mediaAssetId.cloudinaryPublicId;
+          track.durationMs = track.mediaAssetId.durationMs;
+          track.source = track.mediaAssetId.source;
+          track.youtubeId = track.mediaAssetId.youtubeId;
+        }
+        return track;
+      });
 
     return res.json({ playlist: playlistObj });
   } catch (err) {
@@ -97,7 +101,7 @@ async function addTrackToPlaylist(req, res) {
     const playlist = await Playlist.findOne({ _id: req.params.id, userId: req.user.userId });
     if (!playlist) return res.status(404).json({ message: 'Playlist not found' });
 
-    if (!playlist.trackIds.includes(trackId)) {
+    if (!playlist.trackIds.some((id) => id && id.toString() === trackId.toString())) {
       playlist.trackIds.push(trackId);
       await playlist.save();
     }
