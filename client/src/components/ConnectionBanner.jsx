@@ -2,46 +2,27 @@ import { useState, useEffect } from 'react';
 import { WifiOff, Wifi } from 'lucide-react';
 
 export default function ConnectionBanner() {
-  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [isOnline, setIsOnline] = useState(
+    typeof navigator !== 'undefined' && typeof navigator.onLine === 'boolean'
+      ? navigator.onLine
+      : true
+  );
   const [showRestored, setShowRestored] = useState(false);
 
   useEffect(() => {
-    // A reliable endpoint on 1.1.1.1 that supports CORS
-    const checkConnection = async () => {
-      try {
-        const response = await fetch('https://1.1.1.1/cdn-cgi/trace', { 
-          mode: 'cors',
-          cache: 'no-store' // prevent caching the response
-        });
-        return response.ok;
-      } catch (error) {
-        return false;
-      }
-    };
+    let restoreTimer = null;
 
-    const handleOnline = async () => {
-      // Just because 'online' fired doesn't mean we have internet access
-      // Verify using the trace endpoint
-      const actuallyOnline = await checkConnection();
-      if (actuallyOnline) {
-        setIsOnline(true);
-        setShowRestored(true);
-        setTimeout(() => setShowRestored(false), 3000);
-      } else {
-        // We are on a network, but no internet. Let's poll until we get internet.
-        const intervalId = setInterval(async () => {
-          const onlineNow = await checkConnection();
-          if (onlineNow) {
-            clearInterval(intervalId);
-            setIsOnline(true);
-            setShowRestored(true);
-            setTimeout(() => setShowRestored(false), 3000);
-          }
-        }, 2000);
-      }
+    const handleOnline = () => {
+      setIsOnline(true);
+      setShowRestored(true);
+      if (restoreTimer) clearTimeout(restoreTimer);
+      restoreTimer = setTimeout(() => {
+        setShowRestored(false);
+      }, 3000);
     };
 
     const handleOffline = () => {
+      if (restoreTimer) clearTimeout(restoreTimer);
       setIsOnline(false);
       setShowRestored(false);
     };
@@ -49,18 +30,30 @@ export default function ConnectionBanner() {
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
 
-    // Perform an initial check just in case navigator.onLine is a false positive
-    if (navigator.onLine) {
-      checkConnection().then(online => {
-        if (!online) setIsOnline(false);
-      });
+    // If currently offline according to state, check periodically if connection has resumed
+    let pollInterval = null;
+    if (!isOnline) {
+      pollInterval = setInterval(async () => {
+        if (navigator.onLine) {
+          try {
+            const res = await fetch('/api/health', { method: 'GET', cache: 'no-store' });
+            if (res.ok) {
+              handleOnline();
+            }
+          } catch {
+            // Still offline
+          }
+        }
+      }, 3000);
     }
 
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
+      if (restoreTimer) clearTimeout(restoreTimer);
+      if (pollInterval) clearInterval(pollInterval);
     };
-  }, []);
+  }, [isOnline]);
 
   if (isOnline && !showRestored) return null;
 
