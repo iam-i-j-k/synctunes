@@ -51,12 +51,12 @@ export default function LibraryPage() {
         socket.emit('playback:trackChange', { roomId: currentRoom._id, trackId, actionSequence });
       } else {
         const { data: { room } } = await api.post('/rooms/personal');
-        api.post(`/rooms/${room._id}/tracks/add-existing`, { trackId }).catch(console.error);
+        await api.post(`/rooms/${room._id}/tracks/add-existing`, { trackId }).catch(console.error);
         socket.emit('room:join', { roomId: room._id });
         
         setTimeout(() => {
-          const { actionSequence: freshSeq } = useplaybackStore.getState();
-          socket.emit('playback:trackChange', { roomId: room._id, trackId, actionSequence: freshSeq });
+          const seq = useplaybackStore.getState().actionSequence;
+          socket.emit('playback:trackChange', { roomId: room._id, trackId, actionSequence: seq });
         }, 150);
       }
       toast.success('Track added to room queue');

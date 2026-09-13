@@ -43,18 +43,9 @@ export default function RoomPage() {
     setLoadingRoom(true);
     setRoomError('');
 
-    function onRoomState({ room }) {
+    function onRoomState() {
       setRoomError('');
       setLoadingRoom(false);
-      api
-        .get(`/rooms/${roomId}/tracks`)
-        .then(({ data }) => {
-          setTracks(data.tracks);
-        })
-        .catch((err) => {
-          console.error(err);
-          setRoomError('Unable to load room tracks.');
-        });
     }
 
     function onRoomStateError(error) {

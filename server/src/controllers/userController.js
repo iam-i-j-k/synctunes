@@ -12,7 +12,9 @@ async function toggleLikeTrack(req, res) {
     const user = await User.findById(userId);
     if (!user) return res.status(404).json({ message: 'User not found' });
 
-    const trackIndex = user.likedTracks.indexOf(trackId);
+    const trackIndex = user.likedTracks.findIndex(
+      (id) => (id ? id.toString() : '') === trackId.toString()
+    );
     let liked = false;
 
     if (trackIndex === -1) {
@@ -38,16 +40,20 @@ async function getLikedTracks(req, res) {
     });
     if (!user) return res.status(404).json({ message: 'User not found' });
     
-    // Transform tracks so cloudinaryUrl/durationMs appear at top level
-    const tracks = (user.likedTracks || []).map(track => {
-      const trackObj = typeof track.toObject === 'function' ? track.toObject() : { ...track };
-      if (trackObj.mediaAssetId && typeof trackObj.mediaAssetId === 'object') {
-        trackObj.cloudinaryUrl = trackObj.mediaAssetId.cloudinaryUrl;
-        trackObj.cloudinaryPublicId = trackObj.mediaAssetId.cloudinaryPublicId;
-        trackObj.durationMs = trackObj.mediaAssetId.durationMs;
-      }
-      return trackObj;
-    });
+    // Filter out any dangling deleted track references and transform
+    const tracks = (user.likedTracks || [])
+      .filter((track) => track && track._id)
+      .map((track) => {
+        const trackObj = typeof track.toObject === 'function' ? track.toObject() : { ...track };
+        if (trackObj.mediaAssetId && typeof trackObj.mediaAssetId === 'object') {
+          trackObj.cloudinaryUrl = trackObj.mediaAssetId.cloudinaryUrl;
+          trackObj.cloudinaryPublicId = trackObj.mediaAssetId.cloudinaryPublicId;
+          trackObj.durationMs = trackObj.mediaAssetId.durationMs;
+          trackObj.source = trackObj.mediaAssetId.source;
+          trackObj.youtubeId = trackObj.mediaAssetId.youtubeId;
+        }
+        return trackObj;
+      });
 
     return res.json({ tracks });
   } catch (err) {

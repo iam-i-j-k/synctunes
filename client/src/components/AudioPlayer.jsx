@@ -378,13 +378,37 @@ export default function AudioPlayer() {
     }
   }, [playbackState.isPlaying]);
 
+  const currentTimeRef = useRef(0);
+  currentTimeRef.current = currentTime;
+
+  useEffect(() => {
+    function handleGlobalUp() {
+      if (seekingRef.current) {
+        seekingRef.current = false;
+        socket.emit('playback:seek', {
+          roomId,
+          actionSequence,
+          positionMs: Math.round(currentTimeRef.current * 1000),
+        });
+      }
+    }
+    window.addEventListener('mouseup', handleGlobalUp);
+    window.addEventListener('touchend', handleGlobalUp);
+    return () => {
+      window.removeEventListener('mouseup', handleGlobalUp);
+      window.removeEventListener('touchend', handleGlobalUp);
+    };
+  }, [roomId, actionSequence]);
+
   function handleSeekStart() {
     seekingRef.current = true;
   }
 
   function handleSeekMove(e) {
     seekingRef.current = true;
-    setCurrentTime(parseFloat(e.target.value));
+    const val = parseFloat(e.target.value);
+    setCurrentTime(val);
+    currentTimeRef.current = val;
   }
 
   function handleSeekEnd(e) {
@@ -392,6 +416,7 @@ export default function AudioPlayer() {
     seekingRef.current = false;
     const positionSec = parseFloat(e.target.value);
     setCurrentTime(positionSec);
+    currentTimeRef.current = positionSec;
     socket.emit('playback:seek', {
       roomId,
       actionSequence,
@@ -946,7 +971,7 @@ export default function AudioPlayer() {
         />
       )}
 
-      {showAddModal && (
+      {showAddModal && currentTrack && (
         <AddToPlaylistModal 
           track={currentTrack} 
           onClose={() => setShowAddModal(false)} 
