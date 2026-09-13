@@ -113,10 +113,11 @@ export function usePlaybackSync(roomId) {
       }
     }, DRIFT_INTERVAL_MS);
 
-    // Keep the heartbeat response listener to update store with authoritative track/sequence
+    // Keep the heartbeat response listener to sync timing data for drift correction.
+    // Uses applySyncUpdate so it does NOT trigger Howl recreation.
     function handleHeartbeatResponse({ playbackState, actionSequence }) {
       const store = usePlaybackStore.getState();
-      store.applyPlaybackUpdate(playbackState, actionSequence, store.currentTrackId);
+      store.applySyncUpdate(playbackState, actionSequence);
     }
     socket.on('playback:heartbeatResponse', handleHeartbeatResponse);
 

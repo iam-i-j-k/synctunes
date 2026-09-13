@@ -20,6 +20,12 @@ const usePlaybackStore = create((set, get) => ({
 
   currentTrackSource: null,
 
+  // Epoch counter: increments only on real play/pause/trackChange/seek events,
+  // NOT on heartbeat sync updates. The AudioPlayer effect depends on this
+  // instead of serverStartTime/startPosition to avoid recreating the Howl
+  // on every heartbeat response.
+  playbackEpoch: 0,
+
   setClockSync: (offset, rtt) => set({ clientServerOffset: offset, currentRtt: rtt }),
 
   getServerNow: () => Date.now() + get().clientServerOffset,
@@ -89,17 +95,39 @@ const usePlaybackStore = create((set, get) => ({
     });
   },
 
+  // Called for authoritative state changes (play, pause, trackChange, seek, mode).
+  // Increments playbackEpoch so the AudioPlayer effect knows to reload.
   applyPlaybackUpdate: (playbackState, actionSequence, currentTrackId, playbackMode) => {
-    set((state) => ({
-      playbackState,
-      actionSequence,
-      currentTrackId,
-      playbackMode: playbackMode !== undefined ? playbackMode : state.playbackMode,
-      
+    set((state) => {
+      // Detect if this is a meaningful state change that should trigger Howl reload:
+      // - isPlaying changed (play/pause)
+      // - currentTrackId changed (track change)
+      // - actionSequence jumped (seek, mode change, or any new server action)
+      const isNewAction = actionSequence !== state.actionSequence;
+
+      return {
+        playbackState,
+        actionSequence,
+        currentTrackId,
+        playbackMode: playbackMode !== undefined ? playbackMode : state.playbackMode,
+        
+        serverStartTime: playbackState.serverStartTime,
+        startPosition: playbackState.startPosition,
+        isPlaying: playbackState.isPlaying,
+
+        // Only bump epoch on actual state transitions, not heartbeat echoes
+        playbackEpoch: isNewAction ? state.playbackEpoch + 1 : state.playbackEpoch,
+      };
+    });
+  },
+
+  // Called by heartbeat responses — updates timing data for drift correction
+  // without bumping playbackEpoch, so the AudioPlayer doesn't re-create Howl.
+  applySyncUpdate: (playbackState, actionSequence) => {
+    set({
       serverStartTime: playbackState.serverStartTime,
       startPosition: playbackState.startPosition,
-      isPlaying: playbackState.isPlaying,
-    }));
+    });
   },
 
   clearPlayer: () => {
@@ -116,6 +144,7 @@ const usePlaybackStore = create((set, get) => ({
       serverStartTime: 0,
       startPosition: 0,
       isPlaying: false,
+      playbackEpoch: 0,
     });
   },
 }));

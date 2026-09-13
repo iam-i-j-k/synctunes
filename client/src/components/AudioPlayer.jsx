@@ -58,7 +58,8 @@ export default function AudioPlayer() {
     serverStartTime,
     startPosition,
     currentTrackSource,
-    clientServerOffset
+    clientServerOffset,
+    playbackEpoch
   } = usePlaybackStore();
 
   const tracks = useRoomStore((s) => s.tracks);
@@ -157,21 +158,17 @@ export default function AudioPlayer() {
     if (playbackState.isPlaying) {
       if (currentTrack.cloudinaryUrl || currentTrack.source === 'YOUTUBE') {
         const audioUrl = currentTrack.cloudinaryUrl || '';
-        loadAndPlayTrack(audioUrl, playbackState.serverStartTime, playbackState.startPosition, currentTrack.source, currentTrack.youtubeId);
+        // Read timing values from store at call time to get the latest
+        const store = usePlaybackStore.getState();
+        loadAndPlayTrack(audioUrl, store.serverStartTime, store.startPosition, currentTrack.source, currentTrack.youtubeId);
       }
     } else {
       stopTrack();
     }
-  }, [playbackState.isPlaying, currentTrackId, playbackState.serverStartTime, playbackState.startPosition, currentTrack?.source]);
+  }, [playbackState.isPlaying, currentTrackId, playbackEpoch, currentTrack?.source]);
 
-  // Stop Howl when switching sources
-  useEffect(() => {
-    if (howlInstance) {
-      try { howlInstance.stop(); } catch(e) {}
-      try { howlInstance.unload(); } catch(e) {}
-      try { Howler.stop(); } catch(e) {}
-    }
-  }, [currentTrackSource]);
+  // NOTE: Howl cleanup when switching sources is handled by loadAndPlayTrack itself,
+  // which stops and unloads the previous Howl before creating a new one.
 
   useEffect(() => {
     Howler.volume(volume);
