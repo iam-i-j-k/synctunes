@@ -30,24 +30,57 @@ const usePlaybackStore = create((set, get) => ({
 
   getServerNow: () => Date.now() + get().clientServerOffset,
 
+  ytPlayer: null,
+  setYtPlayer: (player) => set({ ytPlayer: player }),
+
   loadAndPlayTrack: (url, serverStartTime, startPosition, source, youtubeId) => {
-    const { howlInstance: currentHowl, syncInterval } = get();
+    const { howlInstance: currentHowl, ytPlayer, syncInterval } = get();
     
+    // Cleanup Howler
     if (currentHowl) {
       if (syncInterval) clearInterval(syncInterval);
       try { currentHowl.stop(); } catch(e) {}
       try { currentHowl.unload(); } catch(e) {}
       set({ howlInstance: null });
     }
+    // Cleanup YouTube
+    if (ytPlayer && source !== 'YOUTUBE') {
+      try { ytPlayer.pauseVideo(); } catch (e) {}
+    }
     // Force-stop all Howler audio globally as a safety net
     try { Howler.stop(); } catch(e) {}
 
-    let finalUrl = url;
+    const correctedNow = get().getServerNow();
+    const elapsedSeconds = (correctedNow - serverStartTime) / 1000;
+    const targetPosition = Math.max(0, startPosition + elapsedSeconds);
+
     if (source === 'YOUTUBE') {
-      const apiUrl = import.meta.env.VITE_API_URL || '/api';
-      finalUrl = `${apiUrl}/youtube/stream/${youtubeId}.m4a`;
+      // For YouTube, we just set the store state. 
+      // The AudioPlayer component watches this state and calls ytPlayer methods.
+      set({
+        currentTrackSource: source,
+        pendingYoutubeId: youtubeId,
+        serverStartTime,
+        startPosition,
+        isPlaying: true,
+      });
+      // If ytPlayer is already ready, instruct it to seek and play
+      if (ytPlayer) {
+        try {
+          // If it's a new video, load it. Otherwise just seek.
+          // We rely on AudioPlayer to call loadVideoById if the ID changes,
+          // but if it's the same video resuming, we just seek and play.
+          ytPlayer.seekTo(targetPosition, true);
+          ytPlayer.playVideo();
+        } catch (e) {
+          console.error('ytPlayer seek/play error:', e);
+        }
+      }
+      return;
     }
 
+    // For uploaded tracks, use Howler
+    let finalUrl = url;
     const formatHint = finalUrl.includes('youtube/stream') ? ['m4a', 'mp3'] : undefined;
 
     const howlInstance = new Howl({
@@ -62,10 +95,9 @@ const usePlaybackStore = create((set, get) => ({
           return;
         }
 
-        const correctedNow = get().getServerNow();
-        const elapsedSeconds = (correctedNow - serverStartTime) / 1000;
-        const targetPosition = startPosition + elapsedSeconds;
-        this.seek(Math.max(0, targetPosition));
+        const currentElapsed = (get().getServerNow() - get().serverStartTime) / 1000;
+        const currentTarget = get().startPosition + currentElapsed;
+        this.seek(Math.max(0, currentTarget));
         this.play();
       }
     });
@@ -73,7 +105,7 @@ const usePlaybackStore = create((set, get) => ({
     set({
       howlInstance,
       currentTrackSource: source,
-      pendingYoutubeId: source === 'YOUTUBE' ? youtubeId : null,
+      pendingYoutubeId: null,
       serverStartTime,
       startPosition,
       isPlaying: true,
@@ -87,6 +119,12 @@ const usePlaybackStore = create((set, get) => ({
       try { pos = state.howlInstance.seek() || pos; } catch (e) {}
       state.howlInstance.stop();
       state.howlInstance.unload();
+    }
+    if (state.ytPlayer) {
+      try { 
+        pos = state.ytPlayer.getCurrentTime() || pos; 
+        state.ytPlayer.pauseVideo();
+      } catch (e) {}
     }
     set({
       howlInstance: null,
@@ -134,6 +172,9 @@ const usePlaybackStore = create((set, get) => ({
     const state = get();
     if (state.howlInstance) {
       state.howlInstance.unload();
+    }
+    if (state.ytPlayer) {
+      try { state.ytPlayer.stopVideo(); } catch (e) {}
     }
     set({
       playbackState: { isPlaying: false, serverStartTime: 0, startPosition: 0 },

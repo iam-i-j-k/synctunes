@@ -11,6 +11,7 @@ import { toast } from 'react-hot-toast';
 import ContextMenu from './ContextMenu';
 import { downloadTrack } from '../utils/downloadTrack';
 import AddToPlaylistModal from './AddToPlaylistModal';
+import YouTube from 'react-youtube';
 
 function formatSec(sec) {
   if (isNaN(sec) || !isFinite(sec) || sec < 0) return '0:00';
@@ -59,7 +60,9 @@ export default function AudioPlayer() {
     startPosition,
     currentTrackSource,
     clientServerOffset,
-    playbackEpoch
+    playbackEpoch,
+    ytPlayer,
+    setYtPlayer
   } = usePlaybackStore();
 
   const tracks = useRoomStore((s) => s.tracks);
@@ -172,7 +175,10 @@ export default function AudioPlayer() {
 
   useEffect(() => {
     Howler.volume(volume);
-  }, [volume]);
+    if (ytPlayer) {
+      try { ytPlayer.setVolume(volume * 100); } catch (e) {}
+    }
+  }, [volume, ytPlayer]);
 
   useEffect(() => {
     // playback:update is already handled by useRoomConnection — only handle staleAction here
@@ -194,12 +200,15 @@ export default function AudioPlayer() {
   }, [applyPlaybackUpdate]);
 
   useEffect(() => {
-    if (!howlInstance) return;
-
     let frameId;
     function updateFrame() {
       if (!seekingRef.current) {
-        if (howlInstance) {
+        if (currentTrackSource === 'YOUTUBE' && ytPlayer) {
+          try {
+            const pos = ytPlayer.getCurrentTime();
+            if (typeof pos === 'number' && pos >= 0) setCurrentTime(pos);
+          } catch (e) {}
+        } else if (howlInstance) {
           let pos = 0;
           try { pos = howlInstance.seek(); } catch (e) {}
           if (typeof pos === 'number') setCurrentTime(pos);
@@ -210,14 +219,14 @@ export default function AudioPlayer() {
     
     if (playbackState.isPlaying) {
       frameId = requestAnimationFrame(updateFrame);
-    } else if (howlInstance) {
+    } else if (howlInstance || ytPlayer) {
       setCurrentTime(playbackState.startPosition);
     }
 
     return () => {
       cancelAnimationFrame(frameId);
     };
-  }, [howlInstance, currentTrackSource, playbackState.isPlaying, playbackState.startPosition]);
+  }, [howlInstance, ytPlayer, currentTrackSource, playbackState.isPlaying, playbackState.startPosition]);
 
   useEffect(() => {
     if (!howlInstance) return;
@@ -308,6 +317,9 @@ export default function AudioPlayer() {
         if (howlInstance) {
           try { howlInstance.seek(seekTime); } catch(e) {}
         }
+        if (ytPlayer && currentTrackSource === 'YOUTUBE') {
+          try { ytPlayer.seekTo(seekTime, true); } catch(e) {}
+        }
         setCurrentTime(seekTime);
         socket.emit('playback:seek', {
           roomId,
@@ -316,7 +328,7 @@ export default function AudioPlayer() {
         });
       });
     }
-  }, [currentTrack, roomId, actionSequence]);
+  }, [currentTrack, roomId, actionSequence, howlInstance, ytPlayer, currentTrackSource]);
 
   useEffect(() => {
     if ('mediaSession' in navigator) {
@@ -461,6 +473,48 @@ export default function AudioPlayer() {
   const seekPercentage = displayDuration > 0 ? (currentVal / displayDuration) * 100 : 0;
   const volumePercentage = volume * 100;
 
+  const ytOpts = {
+    height: '0',
+    width: '0',
+    playerVars: {
+      autoplay: 0,
+      controls: 0,
+      disablekb: 1,
+      fs: 0,
+      iv_load_policy: 3,
+      modestbranding: 1,
+      rel: 0,
+      showinfo: 0,
+    },
+  };
+
+  const onYtReady = (event) => {
+    setYtPlayer(event.target);
+    event.target.setVolume(volume * 100);
+    // If a YouTube track was already selected before the player loaded, 
+    // loadAndPlayTrack would have set currentTrackSource and isPlaying.
+    // We should trigger playback now that the player is ready.
+    if (currentTrack?.source === 'YOUTUBE' && playbackState.isPlaying) {
+      const store = usePlaybackStore.getState();
+      store.loadAndPlayTrack('', store.serverStartTime, store.startPosition, 'YOUTUBE', currentTrack.youtubeId);
+    }
+  };
+
+  const onYtStateChange = (event) => {
+    // YT.PlayerState.PLAYING = 1
+    // Update duration when playing
+    if (event.data === 1 && ytPlayer) {
+      const dur = ytPlayer.getDuration();
+      if (dur > 0) setDuration(dur);
+    }
+  };
+
+  const onYtEnd = () => {
+    if (!seekingRef.current) {
+      socket.emit('playback:next', { roomId, actionSequence });
+    }
+  };
+
   return (
     <>
       <style>{`
@@ -474,6 +528,17 @@ export default function AudioPlayer() {
         }
       `}</style>
 
+      {/* Hidden YouTube Player for Audio Streaming */}
+      <div className="hidden pointer-events-none absolute w-0 h-0 overflow-hidden">
+        <YouTube
+          videoId={currentTrackSource === 'YOUTUBE' ? currentTrack?.youtubeId : ''}
+          opts={ytOpts}
+          onReady={onYtReady}
+          onStateChange={onYtStateChange}
+          onEnd={onYtEnd}
+          onError={(e) => console.error("YouTube Player Error:", e)}
+        />
+      </div>
 
       {/* COMPACT / DESKTOP PLAYER */}
       <div 

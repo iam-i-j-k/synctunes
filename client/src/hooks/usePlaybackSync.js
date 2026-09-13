@@ -125,5 +125,5 @@ export function usePlaybackSync(roomId) {
       clearInterval(interval);
       socket.off('playback:heartbeatResponse', handleHeartbeatResponse);
     };
-  }, [isPlaying, roomId, howlInstance, clientServerOffset, serverStartTime, startPosition]);
+  }, [isPlaying, roomId, howlInstance, ytPlayer, currentTrackSource, clientServerOffset, serverStartTime, startPosition]);
 }
