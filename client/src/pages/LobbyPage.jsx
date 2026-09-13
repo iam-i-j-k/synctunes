@@ -70,7 +70,7 @@ export default function LobbyPage() {
     try {
       setLoading(true);
       const { data } = await api.get('/rooms');
-      setRooms(data.rooms);
+      setRooms(data?.rooms || []);
     } catch {
       setError('Failed to load rooms');
     } finally {
@@ -128,8 +128,8 @@ export default function LobbyPage() {
     navigate('/login');
   }
 
-  const publicRooms = rooms.filter(r => !r.isPrivate);
-  const privateRooms = rooms.filter(r => r.isPrivate);
+  const publicRooms = (rooms || []).filter(r => !r.isPrivate);
+  const privateRooms = (rooms || []).filter(r => r.isPrivate);
 
   return (
     <div className="p-4 md:p-8 flex-1 overflow-y-auto h-full w-full">
