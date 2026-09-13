@@ -29,7 +29,9 @@ export default function TrackList() {
 
   if (!currentRoom) return null;
 
-  const hostId = currentRoom.hostId?.toString() || currentRoom.hostId?._id?.toString();
+  const hostId = currentRoom.hostId?._id 
+    ? currentRoom.hostId._id.toString() 
+    : currentRoom.hostId?.toString();
   const isHost = hostId === user?.id;
 
   function handleSelect(trackId) {

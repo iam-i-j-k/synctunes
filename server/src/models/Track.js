@@ -36,4 +36,7 @@ const trackSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+trackSchema.index({ uploadedBy: 1 });
+trackSchema.index({ roomId: 1, createdAt: -1 });
+
 module.exports = mongoose.model('Track', trackSchema);

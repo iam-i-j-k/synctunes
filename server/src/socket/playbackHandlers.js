@@ -89,8 +89,9 @@ function registerPlaybackHandlers(io, socket, roomCache) {
       return rejectStale(socket, state);
     }
 
+    const elapsedSeconds = (Date.now() - state.playbackState.serverStartTime) / 1000;
     state.playbackState.startPosition =
-      (Date.now() - state.playbackState.serverStartTime) / 1000;
+      (state.playbackState.startPosition || 0) + elapsedSeconds;
     state.playbackState.isPlaying = false;
     state.actionSequence += 1;
 
@@ -237,7 +238,7 @@ function registerPlaybackHandlers(io, socket, roomCache) {
                 // Find or create MediaAsset
                 let asset = await MediaAsset.findOne({ youtubeId: related.videoId });
                 if (!asset) {
-                  const contentHash = crypto.createHash('sha256').update(`yt_${related.videoId}`).digest('hex');
+                  const contentHash = crypto.createHash('sha256').update(`youtube:${related.videoId}`).digest('hex');
                   asset = new MediaAsset({
                     contentHash,
                     source: 'YOUTUBE',
@@ -325,7 +326,7 @@ function registerPlaybackHandlers(io, socket, roomCache) {
 
     // If playing for more than 3 seconds, restart the current track
     const currentPosition = state.playbackState.isPlaying 
-      ? (Date.now() - state.playbackState.serverStartTime) / 1000 
+      ? (state.playbackState.startPosition || 0) + (Date.now() - state.playbackState.serverStartTime) / 1000 
       : state.playbackState.startPosition;
       
     if (currentPosition > 3) {

@@ -1,6 +1,8 @@
 require('dotenv').config();
-const dns = require('dns');
-dns.setServers(['1.1.1.1', '8.8.8.8']);
+if (process.env.ENABLE_CUSTOM_DNS === 'true') {
+  const dns = require('dns');
+  dns.setServers(['1.1.1.1', '8.8.8.8']);
+}
 const http = require('http');
 const express = require('express');
 const cors = require('cors');
@@ -39,6 +41,12 @@ app.use('/api/search', searchRoutes);
 app.use('/api/notifications', notificationRoutes);
 
 app.get('/api/health', (_req, res) => res.json({ status: 'ok' }));
+
+// Global error handler
+app.use((err, _req, res, _next) => {
+  console.error('Unhandled server error:', err);
+  res.status(err.status || 500).json({ message: err.message || 'Internal server error' });
+});
 
 // ── Socket.io ────────────────────────────────────────────────────────────────
 initSocket(server, app);

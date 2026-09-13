@@ -28,4 +28,6 @@ const playHistorySchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+playHistorySchema.index({ userId: 1, playedAt: -1 });
+
 module.exports = mongoose.model('PlayHistory', playHistorySchema);

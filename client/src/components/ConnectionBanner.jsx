@@ -6,38 +6,25 @@ export default function ConnectionBanner() {
   const [showRestored, setShowRestored] = useState(false);
 
   useEffect(() => {
-    // A reliable endpoint on 1.1.1.1 that supports CORS
     const checkConnection = async () => {
       try {
-        const response = await fetch('https://1.1.1.1/cdn-cgi/trace', { 
-          mode: 'cors',
-          cache: 'no-store' // prevent caching the response
+        const res = await fetch('/api/health', {
+          method: 'GET',
+          cache: 'no-store',
         });
-        return response.ok;
-      } catch (error) {
-        return false;
+        return res.ok;
+      } catch {
+        // If server is temporarily unreachable or offline
+        return navigator.onLine;
       }
     };
 
     const handleOnline = async () => {
-      // Just because 'online' fired doesn't mean we have internet access
-      // Verify using the trace endpoint
       const actuallyOnline = await checkConnection();
       if (actuallyOnline) {
         setIsOnline(true);
         setShowRestored(true);
         setTimeout(() => setShowRestored(false), 3000);
-      } else {
-        // We are on a network, but no internet. Let's poll until we get internet.
-        const intervalId = setInterval(async () => {
-          const onlineNow = await checkConnection();
-          if (onlineNow) {
-            clearInterval(intervalId);
-            setIsOnline(true);
-            setShowRestored(true);
-            setTimeout(() => setShowRestored(false), 3000);
-          }
-        }, 2000);
       }
     };
 
@@ -48,13 +35,6 @@ export default function ConnectionBanner() {
 
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
-
-    // Perform an initial check just in case navigator.onLine is a false positive
-    if (navigator.onLine) {
-      checkConnection().then(online => {
-        if (!online) setIsOnline(false);
-      });
-    }
 
     return () => {
       window.removeEventListener('online', handleOnline);

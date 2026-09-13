@@ -22,4 +22,17 @@ export default defineConfig({
       },
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'react-vendor': ['react', 'react-dom', 'react-router-dom'],
+          'player-vendor': ['howler', 'react-youtube'],
+          'ui-vendor': ['lucide-react', 'react-hot-toast', '@hello-pangea/dnd'],
+          'oauth-vendor': ['@react-oauth/google'],
+        },
+      },
+    },
+    chunkSizeWarningLimit: 600,
+  },
 });

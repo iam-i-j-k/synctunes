@@ -9,7 +9,9 @@ export default function MemberList() {
 
   if (!currentRoom) return null;
 
-  const hostId = currentRoom.hostId?.toString() || currentRoom.hostId?._id?.toString();
+  const hostId = currentRoom.hostId?._id 
+    ? currentRoom.hostId._id.toString() 
+    : currentRoom.hostId?.toString();
   const isHost = hostId === user?.id;
 
   async function handleKick(memberId) {

@@ -97,7 +97,8 @@ async function addTrackToPlaylist(req, res) {
     const playlist = await Playlist.findOne({ _id: req.params.id, userId: req.user.userId });
     if (!playlist) return res.status(404).json({ message: 'Playlist not found' });
 
-    if (!playlist.trackIds.includes(trackId)) {
+    const alreadyInPlaylist = playlist.trackIds.some((id) => id.toString() === trackId.toString());
+    if (!alreadyInPlaylist) {
       playlist.trackIds.push(trackId);
       await playlist.save();
     }

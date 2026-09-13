@@ -72,4 +72,7 @@ const roomSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+roomSchema.index({ isPersonalLibrary: 1, hostId: 1 });
+roomSchema.index({ memberIds: 1 });
+
 module.exports = mongoose.model('Room', roomSchema);
