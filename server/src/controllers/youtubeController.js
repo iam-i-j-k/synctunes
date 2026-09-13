@@ -24,7 +24,6 @@ if (process.env.YT_COOKIES) {
 function getYoutubeDlOptions(extraOptions = {}) {
   const options = {
     noWarnings: true,
-    noCallHome: true,
     noCheckCertificate: true,
     ...extraOptions
   };
@@ -101,7 +100,11 @@ async function streamYouTube(req, res) {
         }
       } catch (err) {
         console.error('yt-dlp extract error:', err.message);
-        return res.status(500).json({ message: 'Failed to extract stream URL' });
+        return res.status(500).json({ 
+          message: 'Failed to extract stream URL', 
+          error: err.message,
+          stack: err.stack
+        });
       }
     }
 
@@ -131,7 +134,10 @@ async function streamYouTube(req, res) {
     proxyReq.on('error', (err) => {
       console.error('Stream proxy error:', err.message);
       if (!res.headersSent) {
-        res.status(500).end();
+        res.status(500).json({
+          message: 'Stream proxy error',
+          error: err.message
+        });
       }
     });
 
