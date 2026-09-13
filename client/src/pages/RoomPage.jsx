@@ -47,9 +47,6 @@ export default function RoomPage() {
     function onRoomState(data) {
       setRoomError('');
       setLoadingRoom(false);
-      if (data.messages) {
-        setMessages(data.messages);
-      }
     }
 
     function onRoomStateError(error) {

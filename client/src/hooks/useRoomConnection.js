@@ -12,9 +12,13 @@ export function useRoomConnection() {
   const { applyPlaybackUpdate } = useplaybackStore();
 
   useEffect(() => {
-    function onRoomState({ room, members, actionSequence }) {
+    function onRoomState({ room, members, messages, actionSequence }) {
       setRoom(room);
       setMembers(members);
+      if (messages) {
+        const { setMessages } = useRoomStore.getState();
+        setMessages(messages);
+      }
       applyPlaybackUpdate(room.playbackState, actionSequence, room.currentTrackId, room.playbackMode);
       
       api.get(`/rooms/${room._id}/tracks`)

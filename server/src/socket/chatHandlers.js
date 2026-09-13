@@ -23,7 +23,7 @@ function setupChatHandlers(io, socket) {
 
       const message = {
         senderId: sender._id,
-        senderName: sender.name,
+        senderName: sender.username,
         text: text.trim(),
         timestamp: new Date()
       };
