@@ -90,6 +90,7 @@ function registerRoomHandlers(io, socket, roomCache) {
           playbackMode: state.playbackMode,
         },
         members,
+        messages: room.messages || [],
         actionSequence: state.actionSequence,
       });
 

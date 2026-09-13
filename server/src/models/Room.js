@@ -9,6 +9,16 @@ const playbackStateSchema = new mongoose.Schema(
   { _id: false }
 );
 
+const messageSchema = new mongoose.Schema(
+  {
+    senderId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    senderName: { type: String, required: true },
+    text: { type: String, required: true },
+    timestamp: { type: Date, default: Date.now },
+  },
+  { _id: false }
+);
+
 const roomSchema = new mongoose.Schema(
   {
     name: {
@@ -67,6 +77,10 @@ const roomSchema = new mongoose.Schema(
     actionSequence: {
       type: Number,
       default: 0,
+    },
+    messages: {
+      type: [messageSchema],
+      default: [],
     },
   },
   { timestamps: true }

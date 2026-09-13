@@ -38,9 +38,13 @@ function initSocket(httpServer, app) {
   io.on('connection', (socket) => {
     // Join a personal channel so the server can unicast to a specific user
     socket.join(`user:${socket.data.user.userId}`);
+    // Also attach userId to socket for easy access
+    socket.userId = socket.data.user.userId;
 
     registerRoomHandlers(io, socket, roomCache);
     registerPlaybackHandlers(io, socket, roomCache);
+    const { setupChatHandlers } = require('./chatHandlers');
+    setupChatHandlers(io, socket);
   });
 
   return io;

@@ -9,12 +9,13 @@ import RoomHeader from '../components/RoomHeader';
 import MemberList from '../components/MemberList';
 import TrackList from '../components/TrackList';
 import TrackUpload from '../components/TrackUpload';
+import RoomChat from '../components/RoomChat';
 import { Play, Pause } from 'lucide-react';
 
 export default function RoomPage() {
   const { id: roomId } = useParams();
   const navigate = useNavigate();
-  const { currentRoom, tracks, setRoom, setMembers, setTracks, addTrack, removeTrack, clearRoom } = useRoomStore();
+  const { currentRoom, tracks, setRoom, setMembers, setTracks, addTrack, removeTrack, clearRoom, setMessages, addMessage } = useRoomStore();
   const { playbackState, actionSequence, currentTrackId, applyPlaybackUpdate, clearPlayer } = useplaybackStore();
 
   function handlePlayPauseRoom() {
@@ -43,9 +44,12 @@ export default function RoomPage() {
     setLoadingRoom(true);
     setRoomError('');
 
-    function onRoomState() {
+    function onRoomState(data) {
       setRoomError('');
       setLoadingRoom(false);
+      if (data.messages) {
+        setMessages(data.messages);
+      }
     }
 
     function onRoomStateError(error) {
@@ -57,9 +61,14 @@ export default function RoomPage() {
       socket.emit('room:join', { roomId });
     }
 
+    function onChatMessage({ message }) {
+      addMessage(message);
+    }
+
     socket.on('room:state', onRoomState);
     socket.on('room:joinError', onRoomStateError);
     socket.on('connect', onConnect);
+    socket.on('chat:newMessage', onChatMessage);
 
     if (token && !socket.connected) {
       connectSocket(token);
@@ -73,8 +82,9 @@ export default function RoomPage() {
       socket.off('room:state', onRoomState);
       socket.off('room:joinError', onRoomStateError);
       socket.off('connect', onConnect);
+      socket.off('chat:newMessage', onChatMessage);
     };
-  }, [roomId]);
+  }, [roomId, setMessages, addMessage, token]);
 
   return (
     <div className="flex flex-col xl:flex-row h-full overflow-y-auto xl:overflow-hidden">
@@ -110,8 +120,9 @@ export default function RoomPage() {
         )}
       </main>
 
-      <aside className="w-full xl:w-[320px] bg-zinc-950/50 flex-shrink-0 flex flex-col xl:h-full max-h-[300px] xl:max-h-full overflow-y-auto">
+      <aside className="w-full xl:w-[320px] bg-zinc-950/50 flex-shrink-0 flex flex-col xl:h-full max-h-[600px] xl:max-h-full overflow-y-auto xl:border-l border-white/5">
         <MemberList />
+        <RoomChat />
       </aside>
     </div>
   );

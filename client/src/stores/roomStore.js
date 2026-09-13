@@ -4,6 +4,7 @@ const useRoomStore = create((set) => ({
   currentRoom: null,
   members: [],
   tracks: [],
+  messages: [],
 
   setRoom: (roomOrUpdater) =>
     set((state) => ({
@@ -14,6 +15,14 @@ const useRoomStore = create((set) => ({
     })),
   setMembers: (members) => set({ members }),
   setTracks: (tracks) => set({ tracks }),
+  setMessages: (messages) => set({ messages }),
+
+  addMessage: (message) =>
+    set((state) => {
+      const newMessages = [...state.messages, message];
+      if (newMessages.length > 50) return { messages: newMessages.slice(newMessages.length - 50) };
+      return { messages: newMessages };
+    }),
 
   addTrack: (track) =>
     set((state) => {
@@ -26,7 +35,7 @@ const useRoomStore = create((set) => ({
       tracks: state.tracks.filter((t) => t._id !== trackId),
     })),
 
-  clearRoom: () => set({ currentRoom: null, members: [], tracks: [] }),
+  clearRoom: () => set({ currentRoom: null, members: [], tracks: [], messages: [] }),
 }));
 
 export default useRoomStore;
