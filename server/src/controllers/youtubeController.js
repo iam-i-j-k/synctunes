@@ -3,6 +3,36 @@ const crypto = require('crypto');
 const Track = require('../models/Track');
 const MediaAsset = require('../models/MediaAsset');
 const Room = require('../models/Room');
+const fs = require('fs');
+const path = require('path');
+const os = require('os');
+
+// In deployed environments, datacenter IPs get blocked by YouTube quickly.
+// We must supply cookies to bypass this.
+let cookiePath = null;
+if (process.env.YT_COOKIES) {
+  try {
+    cookiePath = path.join(os.tmpdir(), 'yt-cookies.txt');
+    fs.writeFileSync(cookiePath, process.env.YT_COOKIES);
+    console.log('YouTube cookies loaded successfully.');
+  } catch (err) {
+    console.error('Failed to write YouTube cookies to temp file:', err);
+    cookiePath = null;
+  }
+}
+
+function getYoutubeDlOptions(extraOptions = {}) {
+  const options = {
+    noWarnings: true,
+    noCallHome: true,
+    noCheckCertificate: true,
+    ...extraOptions
+  };
+  if (cookiePath) {
+    options.cookies = cookiePath;
+  }
+  return options;
+}
 
 async function searchYouTube(req, res) {
   try {
@@ -11,13 +41,10 @@ async function searchYouTube(req, res) {
       return res.json({ videos: [] });
     }
 
-    const output = await youtubedl(`ytsearch15:${q.trim()}`, {
+    const output = await youtubedl(`ytsearch15:${q.trim()}`, getYoutubeDlOptions({
       dumpSingleJson: true,
-      noWarnings: true,
       flatPlaylist: true,
-      noCallHome: true,
-      noCheckCertificate: true
-    });
+    }));
 
     if (!output || !output.entries) {
       return res.json({ videos: [] });
@@ -62,13 +89,10 @@ async function streamYouTube(req, res) {
 
     if (!cachedData) {
       try {
-        const output = await youtubedl(videoUrl, {
+        const output = await youtubedl(videoUrl, getYoutubeDlOptions({
           dumpJson: true,
           format: 'bestaudio[ext=m4a]/bestaudio',
-          noWarnings: true,
-          noCallHome: true,
-          noCheckCertificate: true
-        });
+        }));
         if (output && output.url) {
           cachedData = { url: output.url, headers: output.http_headers || {} };
           urlCache.set(videoId, cachedData);
@@ -188,13 +212,10 @@ async function addYouTubeTrack(req, res) {
     setTimeout(async () => {
       try {
         if (!urlCache.has(videoId)) {
-          const output = await youtubedl(`https://www.youtube.com/watch?v=${videoId}`, {
+          const output = await youtubedl(`https://www.youtube.com/watch?v=${videoId}`, getYoutubeDlOptions({
             dumpJson: true,
             format: 'bestaudio[ext=m4a]/bestaudio',
-            noWarnings: true,
-            noCallHome: true,
-            noCheckCertificate: true
-          });
+          }));
           if (output && output.url) {
             urlCache.set(videoId, { url: output.url, headers: output.http_headers || {} });
             setTimeout(() => urlCache.delete(videoId), 3 * 60 * 60 * 1000);
@@ -215,13 +236,10 @@ async function addYouTubeTrack(req, res) {
 async function ensurePrecached(videoId) {
   if (!videoId || urlCache.has(videoId)) return;
   try {
-    const output = await youtubedl(`https://www.youtube.com/watch?v=${videoId}`, {
+    const output = await youtubedl(`https://www.youtube.com/watch?v=${videoId}`, getYoutubeDlOptions({
       dumpJson: true,
       format: 'bestaudio[ext=m4a]/bestaudio',
-      noWarnings: true,
-      noCallHome: true,
-      noCheckCertificate: true
-    });
+    }));
     if (output && output.url) {
       urlCache.set(videoId, { url: output.url, headers: output.http_headers || {} });
       setTimeout(() => urlCache.delete(videoId), 3 * 60 * 60 * 1000);
