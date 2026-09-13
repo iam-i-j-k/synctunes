@@ -1,7 +1,7 @@
 const Room = require('../models/Room');
 const Track = require('../models/Track');
 const MediaAsset = require('../models/MediaAsset');
-const yts = require('yt-search');
+const play = require('play-dl');
 const crypto = require('crypto');
 
 function registerPlaybackHandlers(io, socket, roomCache) {
@@ -136,12 +136,7 @@ function registerPlaybackHandlers(io, socket, roomCache) {
     persistState(roomId, state);
     broadcast(roomId, state);
 
-    // Step 2: Precache the track URL in the background (takes ~8s for YouTube)
-    const track = await Track.findById(trackId).populate('mediaAssetId');
-    if (track && track.mediaAssetId && track.mediaAssetId.source === 'YOUTUBE') {
-      const { ensurePrecached } = require('../controllers/youtubeController');
-      await ensurePrecached(track.mediaAssetId.youtubeId);
-    }
+    // Precache step removed since frontend uses react-youtube directly
 
     // Step 3: Refresh state and start playing if they didn't skip to another track!
     const newState = await getState(roomId);
@@ -227,12 +222,12 @@ function registerPlaybackHandlers(io, socket, roomCache) {
             }
 
             try {
-              const r = await yts(query);
+                const results = await play.search(query, { limit: 15 });
               const allTracksInRoom = await Track.find({ _id: { $in: room.trackIds } }).populate('mediaAssetId');
               const existingYoutubeIds = allTracksInRoom.map(t => t.mediaAssetId?.youtubeId).filter(Boolean);
 
               // Filter out videos already in the room
-              let validVideos = r.videos.filter(v => !existingYoutubeIds.includes(v.videoId));
+              let validVideos = results.filter(v => !existingYoutubeIds.includes(v.id));
 
               // Filter out videos that are just different versions of the EXACT same song
               // by finding the most prominent word in the current song title
@@ -327,12 +322,7 @@ function registerPlaybackHandlers(io, socket, roomCache) {
     persistState(roomId, state);
     broadcast(roomId, state);
 
-    // Step 2: Precache
-    const track = await Track.findById(state.currentTrackId).populate('mediaAssetId');
-    if (track && track.mediaAssetId && track.mediaAssetId.source === 'YOUTUBE') {
-      const { ensurePrecached } = require('../controllers/youtubeController');
-      await ensurePrecached(track.mediaAssetId.youtubeId);
-    }
+    // Precache step removed
 
     // Step 3: Play if still on this track
     const newState = await getState(roomId);
@@ -395,12 +385,7 @@ function registerPlaybackHandlers(io, socket, roomCache) {
     persistState(roomId, state);
     broadcast(roomId, state);
 
-    // Step 2: Precache
-    const track = await Track.findById(state.currentTrackId).populate('mediaAssetId');
-    if (track && track.mediaAssetId && track.mediaAssetId.source === 'YOUTUBE') {
-      const { ensurePrecached } = require('../controllers/youtubeController');
-      await ensurePrecached(track.mediaAssetId.youtubeId);
-    }
+    // Precache step removed
 
     // Step 3: Play if still on this track
     const newState = await getState(roomId);
